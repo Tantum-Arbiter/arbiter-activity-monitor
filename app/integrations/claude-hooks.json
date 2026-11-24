@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'for d in arbiter-activity-monitor arbiter-system; do f=/Users/cole/Workspace/ai-tools/$d/scripts/session-hook.py; if [ -f $f ]; then exec /usr/bin/python3 $f Claude; fi; done; exit 0'",
+            "command": "/bin/sh -c 'f=/Users/cole/Workspace/arbiter-activity-monitor/app/scripts/session-hook.py; if [ -f $f ]; then exec /usr/bin/python3 $f Claude; fi; exit 0'",
             "timeout": 1
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'for d in arbiter-activity-monitor arbiter-system; do f=/Users/cole/Workspace/ai-tools/$d/scripts/session-hook.py; if [ -f $f ]; then exec /usr/bin/python3 $f Claude; fi; done; exit 0'",
+            "command": "/bin/sh -c 'f=/Users/cole/Workspace/arbiter-activity-monitor/app/scripts/session-hook.py; if [ -f $f ]; then exec /usr/bin/python3 $f Claude; fi; exit 0'",
             "timeout": 1
           }
         ]
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'for d in arbiter-activity-monitor arbiter-system; do f=/Users/cole/Workspace/ai-tools/$d/scripts/session-hook.py; if [ -f $f ]; then exec /usr/bin/python3 $f Claude; fi; done; exit 0'",
+            "command": "/bin/sh -c 'f=/Users/cole/Workspace/arbiter-activity-monitor/app/scripts/session-hook.py; if [ -f $f ]; then exec /usr/bin/python3 $f Claude; fi; exit 0'",
             "timeout": 1
           }
         ]
@@ -38,7 +38,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'for d in arbiter-activity-monitor arbiter-system; do f=/Users/cole/Workspace/ai-tools/$d/scripts/session-hook.py; if [ -f $f ]; then exec /usr/bin/python3 $f Claude; fi; done; exit 0'",
+            "command": "/bin/sh -c 'f=/Users/cole/Workspace/arbiter-activity-monitor/app/scripts/session-hook.py; if [ -f $f ]; then exec /usr/bin/python3 $f Claude; fi; exit 0'",
             "timeout": 1
           }
         ]
@@ -49,7 +49,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'for d in arbiter-activity-monitor arbiter-system; do f=/Users/cole/Workspace/ai-tools/$d/scripts/session-hook.py; if [ -f $f ]; then exec /usr/bin/python3 $f Claude; fi; done; exit 0'",
+            "command": "/bin/sh -c 'f=/Users/cole/Workspace/arbiter-activity-monitor/app/scripts/session-hook.py; if [ -f $f ]; then exec /usr/bin/python3 $f Claude; fi; exit 0'",
             "timeout": 1
           }
         ]
@@ -60,7 +60,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'for d in arbiter-activity-monitor arbiter-system; do f=/Users/cole/Workspace/ai-tools/$d/scripts/session-hook.py; if [ -f $f ]; then exec /usr/bin/python3 $f Claude; fi; done; exit 0'",
+            "command": "/bin/sh -c 'f=/Users/cole/Workspace/arbiter-activity-monitor/app/scripts/session-hook.py; if [ -f $f ]; then exec /usr/bin/python3 $f Claude; fi; exit 0'",
             "timeout": 1
           }
         ]
@@ -71,7 +71,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'for d in arbiter-activity-monitor arbiter-system; do f=/Users/cole/Workspace/ai-tools/$d/scripts/session-hook.py; if [ -f $f ]; then exec /usr/bin/python3 $f Claude; fi; done; exit 0'",
+            "command": "/bin/sh -c 'f=/Users/cole/Workspace/arbiter-activity-monitor/app/scripts/session-hook.py; if [ -f $f ]; then exec /usr/bin/python3 $f Claude; fi; exit 0'",
             "timeout": 1
           }
         ]
@@ -82,7 +82,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'for d in arbiter-activity-monitor arbiter-system; do f=/Users/cole/Workspace/ai-tools/$d/scripts/session-hook.py; if [ -f $f ]; then exec /usr/bin/python3 $f Claude; fi; done; exit 0'",
+            "command": "/bin/sh -c 'f=/Users/cole/Workspace/arbiter-activity-monitor/app/scripts/session-hook.py; if [ -f $f ]; then exec /usr/bin/python3 $f Claude; fi; exit 0'",
             "timeout": 1
           }
         ]
@@ -93,7 +93,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'for d in arbiter-activity-monitor arbiter-system; do f=/Users/cole/Workspace/ai-tools/$d/scripts/session-hook.py; if [ -f $f ]; then exec /usr/bin/python3 $f Claude; fi; done; exit 0'",
+            "command": "/bin/sh -c 'f=/Users/cole/Workspace/arbiter-activity-monitor/app/scripts/session-hook.py; if [ -f $f ]; then exec /usr/bin/python3 $f Claude; fi; exit 0'",
             "timeout": 1
           }
         ]
@@ -104,7 +104,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'for d in arbiter-activity-monitor arbiter-system; do f=/Users/cole/Workspace/ai-tools/$d/scripts/session-hook.py; if [ -f $f ]; then exec /usr/bin/python3 $f Claude; fi; done; exit 0'",
+            "command": "/bin/sh -c 'f=/Users/cole/Workspace/arbiter-activity-monitor/app/scripts/session-hook.py; if [ -f $f ]; then exec /usr/bin/python3 $f Claude; fi; exit 0'",
             "timeout": 1
           }
         ]
@@ -115,7 +115,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'for d in arbiter-activity-monitor arbiter-system; do f=/Users/cole/Workspace/ai-tools/$d/scripts/session-hook.py; if [ -f $f ]; then exec /usr/bin/python3 $f Claude; fi; done; exit 0'",
+            "command": "/bin/sh -c 'f=/Users/cole/Workspace/arbiter-activity-monitor/app/scripts/session-hook.py; if [ -f $f ]; then exec /usr/bin/python3 $f Claude; fi; exit 0'",
             "timeout": 1
           }
         ]
