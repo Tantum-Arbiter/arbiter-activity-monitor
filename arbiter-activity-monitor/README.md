@@ -1,0 +1,152 @@
+---
+status: active
+owner: Sir Luke
+phase: build
+---
+
+# ARBITER Activity Monitor
+
+A working native macOS performance monitor with ARBITER's navy/cyan/violet interface. The Mac is monitored alongside direct Claude/Codex sessions, reported model identities and recorded execution events. Swift 6, SwiftUI, Canvas, Charts, Mach, libproc, IOKit and system SQLite; macOS 14+, no third-party dependencies.
+
+## Build and open
+
+```sh
+cd /Users/cole/Workspace/ai-tools/arbiter-activity-monitor
+swift test
+zsh scripts/build-app.sh
+open dist/arbiter-activity-monitor.app
+```
+
+The generated, ad-hoc-signed bundle is `dist/arbiter-activity-monitor.app`. It is intended for local use, not notarized public distribution. `zsh scripts/build-app.sh --dist` builds a universal (arm64 + x86_64) bundle and zips it to `dist/ARBITER-Activity-Monitor-0.1.0-macos-universal.zip` for sharing; it is still ad-hoc signed, so recipients must approve it once under System Settings → Privacy & Security → Open Anyway. The build generates a Retina icon. It does not install a login item, privileged helper, launch daemon or anything into `/Applications`. Opening `Package.swift` in Xcode also supports development. Build artifacts are ignored by git.
+
+## Included
+
+- Screen-aware window sizing uses the attached display’s usable area and clamps the window after display changes. Wide, medium and compact layouts reflow without overlapping panels; short screens scroll. The display name and window title are **ARBITER Activity Monitor**.
+- Reference-aligned overview: eight resource cards, luminous wire globe and laptop projection, slowly rotating orbit, measured CPU/memory arcs, glass-like navy panels, cyan/violet selection and chart fills. Three dense rows follow the supplied composition; a cyan 30/150-point grid echoes Mission Control. The sphere mesh and connected nodes rotate in 3-D; sidebar waves travel continuously. Gauges and bars ease to new measurements over 0.65 seconds. App/model session rows, GPU history, six-row heatmap, agent throughput, session orchestration, execution timeline and alerts stay interactive. Resource detail sparklines expose source/time/average/peak tooltips.
+- System GPU, renderer and tiler utilization from the Apple Silicon AGX driver; reported shared-memory allocations/in-use bytes. Missing driver fields stay unavailable.
+- AI Agents keeps running, waiting and error sessions visible. Idle/ended/stale sessions collapse under Inactive; sessions without confirmed activity collapse separately. Both groups expand on demand. Orchestration follows an active session by default and supports manual selection. Its fixed-height nodes have separate lanes and explicit connector gaps.
+- Direct Codex metadata (model, cumulative tokens, parent/subagent links) and Claude live session files; lifecycle events from metadata-only hooks supply exact tool/turn/subagent activity. Models and running states are never inferred from process usage.
+- CPU total/user/system/idle, logical core utilization, hardware performance/efficiency core counts. Core indices are not falsely labelled P/E where no mapping has been verified.
+- Unified-memory usage estimate, physical capacity, wired memory, compression, cache, kernel pressure, swap occupancy and swap-in/out rates.
+- Data-volume free/capacity, physical storage-driver read/write throughput and IOPS when available.
+- Physical `en*` interface names, upload/download rates and cumulative 64-bit network counters; excludes VPN/bridge/loopback to avoid double counting.
+- Internal battery charge/source, observed charge history and explicitly estimated drain after 60 seconds; thermal pressure from macOS.
+- Searchable process inventory with user/system/pinned filters; CPU/memory/read/write/name sorting; PID, parent, threads, disk counters and OS state. Inspector shows local executable path, lifetime, cumulative CPU time, recent CPU history, children, pin and explicit tracking controls.
+- Agent Orchestration draws the selected session's **observed harness** instead of a fixed diagram: the harness process (from the PID in Claude's session metadata, or the detected MLX runtime), the agent and its status, the reported model, the tools and subagents named in lifecycle events, and the processes started under the harness process. Links are solid where something was observed and dashed where it was not. Hovering a node shows its facts (process name, PID, state, CPU, memory, uptime, per-tool call and failure counts, subagent states, child processes); clicking a node, **Inspect session**, or double-clicking an AI Agents row opens the **Session inspector** with the full process tree, tool table, subagents and the last 30 recorded events. Codex metadata reports no session PID, so its Process and Processes nodes read "Not reported". Tool counts cover the retained window of the last 120 events per session. Nothing beyond the existing allowlist is read: no prompts, commands, tool input/output or transcripts.
+- MLX runtime detection: a Python process is shown as an **MLX** workload and AI Agents row once it has MLX's native runtime mapped (`mlx/lib/libmlx.dylib` or `mlx/core.<abi>.so`), which covers `mlx_lm.server`, `mlx_lm.generate`, `mlx_lm.chat` and other Python tools built on MLX. Verified against mlx 0.32.4 with a direct `mlx.core` computation and against `mlx_lm.server` from mlx-lm 0.32.2; other MLX versions and non-Python hosts are untested. The check walks the process's mapped regions through `proc_pidinfo(PROC_PIDREGIONPATHINFO)` and compares file names only; it never reads arguments, environment, model files or file contents. Only the current user's Python interpreters are walked, at most 24 per pass; an interpreter without MLX is rechecked every 10 seconds so a late `import mlx` is picked up, and a detection is kept for the life of the process. The row reads **Runtime loaded · activity not reported**: MLX exposes no model name, token count or task state to an outside process, so those stay unavailable and the row is not counted as active. An MLX runtime is its own workload even when Claude, Codex or a shell launched it. Apps that link MLX statically (mlx-swift, C++) are not detected. An MLX agent loop can report model and turn events itself by piping the same allowlisted hook payload to `scripts/session-hook.py MLX`.
+- Automatic Codex, Claude, Ollama, MLX, Blender, Python, Node, FFmpeg and VS Code workload roots. Python includes framework builds whose executable is named `Python`. Includes embedded Codex Framework helpers. Real parent/child trees and aggregate resources; explicit tracked roots override automatic attribution. PID + start time prevents identity reuse.
+- 1m/15m/1h/24h/7d history, series toggles, pointer inspection, drag-to-zoom/reset, independent byte/s throughput charts. Longer windows select real observations per time bucket, not synthetic interpolated values. Overview heatmap covers the most recent 30 displayed observations; hover reveals time/value.
+- Persistent warning episodes, start/resolution observations, acknowledgement/dismissal, previous-session end-unobserved state; memory, thermal, sustained CPU, storage and swap-growth conditions. Settings persist sampling, retention, thresholds, navigation and reduced motion.
+- Menu-bar health/CPU/memory-pressure/battery/top-process summary, dashboard reopen, pause/resume and quit. Shortcuts: Cmd+1 Overview, Cmd+2 Processes, Cmd+3 Workloads, Cmd+4 History, Cmd+Shift+P Pause, Cmd+, Settings.
+
+## Measurement correctness
+
+System CPU is percent of all logical cores. Process/workload CPU is percent of one core and can exceed 100%. Mach process times are converted using the machine's timebase before computing rates; a live regression test compares them with `getrusage`. Rates use monotonic time, require a prior observation, and reject resets and long gaps. Initial readings are unavailable, not zero. OS process state `Runnable` is not a claim that the process is actively consuming CPU at that instant.
+
+Memory is unified: there is no separate invented GPU VRAM capacity. The used-memory calculation excludes file cache/purgeable pages and is labelled approximate; it need not match the different aggregate printed by `top`. Workload RSS is the sum of observable member RSS and can double-count shared pages. Some protected processes or counters may be inaccessible; the explorer is the accessible inventory, not a claim of unrestricted kernel visibility.
+
+Automatic attribution uses observed ancestry and start times. Agents take precedence over generic child tools, and an editor parent does not absorb an agent's unrelated siblings. Reparented/detached or already-exited children cannot reliably be recovered and are not guessed. Explicit tracking is session-only. Model identity, token usage, model latency, task outcomes and cloud costs are not inferred from processes. The latest operator instruction restores direct session orchestration. Model names and token counts are shown only when explicitly reported by metadata/hooks; success ratios and model-specific CPU allocation are not invented.
+
+System GPU percentages come from `AGXAccelerator` → `PerformanceStatistics`: `Device Utilization %`, `Renderer Utilization %`, and `Tiler Utilization %`. This capability was verified against the running host's registry and native diagnostic output. These are driver-reported observations, not CPU-like deltas or a guarantee of matching Activity Monitor averaging. The first supported Apple Silicon accelerator is used. Unsupported hardware/keys remain unavailable. GPU allocations share unified memory and are not dedicated VRAM. Per-process GPU/network attribution, temperature, fans and package power remain unavailable. The code does not continuously run `powermetrics`, invoke sudo or install a sensor extension. Physical disk throughput is not represented as fictional disk busy percentage. Network totals are current-interface counters; interface replacement/reset starts a new rate baseline.
+
+## Storage, privacy and scheduling
+
+The actor-isolated native collector runs separately from UI rendering. CPU/memory/disk/network default to one-second collection, processes to at least two seconds, with UI publications coalesced to four seconds on the dense overview and two seconds on detail screens. Inactive windows sample every 15 seconds; Low Power Mode or serious thermal pressure uses at least ten seconds. The reference-matched overview has a separate 75-second decorative orbit, nine-second travelling sidebar/laptop waves, projection rings, a 36-second 3-D mesh rotation with pulsing connected nodes and light moving along measured traces. Balanced defaults to the restrained mesh/orbit; Cinematic adds waves and travelling lights. Motion stops when inactive, paused, reduced-motion, low-power or thermally constrained. The orbit uses a rasterized Core Animation layer; static vector geometry and workload attribution are cached. There is no per-frame telemetry collection or SwiftUI rotation timer. Core Animation requests 6–10 fps for ambient effects and up to 30 fps for brief gauge transitions. Sphere and wave geometry use a bounded set of precomputed keyframes; the compositor interpolates between them. Static panel shadows are separated from moving content; animated path shadows were removed after GPU testing exposed expensive offscreen rendering. The frame-rate range is a compositor preference, not a hard OS guarantee. Hover illumination respects macOS Reduce Motion and the app's own setting.
+
+Short-term aggregate memory history is capped at 900 samples/15 minutes; charts show at most 450; inspected-process history caps at 450 observations; event history caps at 100. SQLite aggregate snapshots are written at most once every ten seconds, with default seven-day retention (configurable 1/7/30 days); old rows are pruned hourly. No raw process inventory is written to history. Longer-window plots show bucket-selected samples; their maxima are not guaranteed to capture spikes between stored observations. Events persist on state changes, not every sample.
+
+Local storage (the folder keeps its original `ArbiterSystem` name, and the bundle identifier stays `local.arbiter.system`, so history, preferences and installed hooks survive the module rename): `~/Library/Application Support/ArbiterSystem/history.sqlite` and its SQLite sidecars. The app creates its storage directory with mode 700 and database with mode 600. Preferences use the app's macOS defaults domain. No cloud calls, analytics, account, credentials, conversation logs, command-line arguments or environment-variable inspection. Session adapters read explicit metadata fields, not transcript content. Hook input may contain private fields supplied by the agent; the adapter ignores those fields and emits only the small allowlist documented below. Paths are only displayed locally in the process inspector. Tests verify process names and paths do not enter SQLite snapshot payloads.
+
+## Validation and remaining work
+
+The build is a usable first release, not a claim that every advanced item in the supplied brief is complete. See [requirements.md](requirements.md) for the full screenshot anatomy, tokens, component/motion/interaction specifications, data mapping and acceptance criteria.
+
+Verified automatically: strict Swift compilation, counter math/reset/warmup handling, PID reuse, ancestry cycles, explicit-root precedence, unrelated sibling exclusion, health classification, native hardware sampling, Mach process-time conversion, SQLite reopen/retention/throttling and process-metadata exclusion. Native UI checks cover navigation, search, process inspection, automatic display fitting on launch, inactive-session expand/collapse, pause/resume and real-data layout. The renamed revision was snapshot-reviewed at 1586-, 1280- and 900-point widths, including the medium two-column layout and separate orchestration lanes. Snapshot review covers the exact 1586 × 992 reference canvas and compact reflow; the live window is checked separately for native chrome, animation and populated events. Release timing is recorded below.
+
+Still requiring dedicated follow-up: verified per-core P/E assignment and cluster averages; additional GPU hardware/sensor adapters; per-process network; batch/peak-preserving historical aggregates and comparative period summaries; process-evidence deep links from historical events; process memory-growth/battery-drain anomaly rules; historical process retention with privacy controls; more extensive VoiceOver, multiple-display, seven-day soak and Instruments validation. Workloads retains real process ancestry. Agent Orchestration shows direct session/model/tool/subagent/response stages; execution flows require live recorded events. Agent Throughput counts observed turn completions, and the timeline uses event timestamps. There are no invented task phases or fabricated jobs.
+
+### Performance measurements
+
+Measured on the actual host, 2026-11-03: 11 logical cores, 18 GiB unified memory. Engineering targets are <2% of one core at idle and <150 MB resident memory for the overview. A 30-second run is a short validation, not a long-term guarantee. CPU is measured independently from `ps` cumulative CPU time divided by monotonic wall time; RSS is process resident memory. Interaction/screenshot periods are excluded from the stated idle intervals.
+
+| Release configuration | Mean CPU, one-core scale | Resident memory | Duration |
+|---|---:|---:|---:|
+| Initial Swift Charts overview | 7.93% | 116.2 MiB | 30 s |
+| Vector overview | 4.33% | 109.8 MiB | 30 s |
+| Two-second UI publication | 3.06% | 125.5 MiB | 30 s |
+| Collector-only, corrected Mach timebase | 0.53% | 21.0 MiB | 30 s |
+| Reference overview, SwiftUI continuous rotation (rejected) | 51.22% | 122.0 MiB | 30 s |
+| Core Animation orbit, still animating SwiftUI gauge trims (rejected) | 10.00% | 144.9 MiB | 30 s |
+| Earlier 4-second overview, after visiting History | 2.30% | 211.2 MiB | 30 s |
+| ARBITER Activity Monitor, 1920 × 1200, 3-D mesh/waves/gauge transitions | 2.30% | 146.5 → 135.9 MiB | 30 s |
+
+The collector-only run averaged 6.4 ms per sample. The initial CPU timebase bug was caught during native validation and fixed before final delivery; the table does not use its invalid earlier CPU estimate. System memory capacity/core count/pressure were cross-checked with `sysctl`, storage with `df`, and system activity with `top`; snapshot timing and memory-accounting definitions differ between tools. The 4-second overview result is slightly above the <2% CPU target; the post-History memory footprint exceeds the 150 MB overview target. These budgets are not certified. No assertion of zero performance impact is made. The compositor-backed orbit avoids the continuous SwiftUI redraw cost; all underlying one-second samples remain in history.
+
+For reproducible checks, leave the release overview visible and untouched during `measure-running.py`. That script waits five seconds for warmup, then measures 30 seconds of process CPU and RSS (it excludes WindowServer/GPU energy):
+
+```sh
+python3 scripts/measure-running.py
+dist/arbiter-activity-monitor.app/Contents/MacOS/arbiter-activity-monitor --benchmark
+dist/arbiter-activity-monitor.app/Contents/MacOS/arbiter-activity-monitor --diagnostics
+```
+
+Diagnostics contain aggregate numeric metrics, not paths or process names. The Settings screen also shows self CPU/RSS and collection duration; those values measure the running UI process rather than the command-line collector alone.
+
+## Primary implementation references
+
+- [Apple's CPU accounting regression source](https://github.com/apple-oss-distributions/xnu/blob/main/tests/recount/recount_perf_tests.c) establishes conversion of task-info counters from Mach time.
+- [Apple's SwiftUI performance guidance](https://developer.apple.com/documentation/Xcode/understanding-and-improving-swiftui-performance) motivates reducing unnecessary invalidations and main-thread work.
+- Installed macOS SDK Mach, libproc, IOKit, routing and SQLite headers define the native interfaces used by this module.
+
+## Reproduce the visual review
+
+```sh
+dist/arbiter-activity-monitor.app/Contents/MacOS/arbiter-activity-monitor --snapshot "$PWD/dist/overview-review.png"
+dist/arbiter-activity-monitor.app/Contents/MacOS/arbiter-activity-monitor --snapshot "$PWD/dist/overview-compact.png" --compact
+dist/arbiter-activity-monitor.app/Contents/MacOS/arbiter-activity-monitor --snapshot "$PWD/dist/overview-medium.png" --width 1280 --height 1600
+dist/arbiter-activity-monitor.app/Contents/MacOS/arbiter-activity-monitor --snapshot "$PWD/dist/harness-hover.png" --hover tools   # process|harness|model|tools|subagents|children|response|output
+dist/arbiter-activity-monitor.app/Contents/MacOS/arbiter-activity-monitor --snapshot "$PWD/dist/session-inspector.png" --inspect   # optional: --session <id prefix>
+```
+
+Snapshots use the actual SwiftUI overview, local aggregate history and fresh native readings. They freeze ambient motion for comparison and leave preferences unchanged. The content renderer uses decorative traffic lights only in snapshot mode; the running app uses native controls. The reference's fictional success/jobs/tokens metrics are replaced by observable local workload measurements. Model identity comes from direct metadata/hooks when reported.
+
+## Claude / Codex integration
+
+The operator explicitly authorized **all local AI workspaces**. Prepared definitions in `integrations/` were merged into `~/.codex/hooks.json` and `~/.claude/settings.json`, preserving other settings/hooks. Both files are mode 600. No package, privileged helper or network receiver is installed.
+
+- Codex: review/trust the new hooks in the composer **Review hooks** or **Settings > Hooks**. Native trust cannot be bypassed. Definitions are active only when the client loads and trusts them.
+- Claude Code: existing sessions may require reload/restart to pick up the new hooks. New sessions emit model identity with SessionStart when available.
+- Metadata works without hooks: Codex recent, unarchived sessions from the read-only state database; Claude registered sessions whose process is alive. Codex recency alone is labelled **Activity unconfirmed**, not Running. Claude model stays unreported until the source supplies it.
+- Local event stream: `~/Library/Application Support/ArbiterSystem/session-events.jsonl`, private mode 600, bounded to approximately 1 MiB. The app reads a maximum 512 KiB tail and 1,000 events, retaining 120 per session in memory. Metadata reads are throttled to at least five seconds; at most 128 recent sessions are displayed internally.
+- Saved hook fields: random event ID, app, session ID, timestamp, event name, model slug, tool **name**, subagent ID. No prompt, command/tool arguments, output, transcript path, cwd, session title or credential is saved. Hook errors fail open with no stdout/context or policy decision.
+- CPU/RAM in AI Agents are explicitly labelled shared **app totals**; they are never attributed to a model/session without a trustworthy source. Tokens are cumulative per session where reported, not a live throughput estimate. “Turns seen” and tool counts cover retained events (bounded per session), not guaranteed all-day totals. Session graphs use real parent/subagent links and lifecycle events. Missing execution events remain clearly indicated.
+
+The hook commands look for `scripts/session-hook.py` under `arbiter-activity-monitor/` and then the pre-rename `arbiter-system/` in this checkout, and exit 0 when neither exists. A bare `python3 <missing file>` exits 2, which Claude Code treats as a blocking hook error on PreToolUse and UserPromptSubmit, so the commands must never fail when the checkout moves; the `arbiter-system` fallback can be dropped once no checkout uses that folder. Moving the checkout elsewhere still requires updating those hook entries. `integrations/` contains the exact definitions for review. Do not replace existing configuration files wholesale with these fragments.
+
+Sources: [Codex lifecycle hooks](https://learn.chatgpt.com/docs/hooks), [Claude Code hooks](https://code.claude.com/docs/en/hooks), [Apple GPU driver statistics presentation](https://devstreaming-cdn.apple.com/videos/wwdc/2014/419xxli6f60a6bs/419/419_advanced_graphics_and_animation_performance.pdf?dl=1).
+
+Validation now includes 25 Swift tests and three Python hook privacy/format tests, including compatibility with macOS `/usr/bin/python3`. The final table row measures the previous revision with the 3-D mesh, travelling waves, gauge transitions and session adapters. CPU remains slightly above the <2% goal; RSS dropped from 146.5 to 135.9 MiB during the sample. This short observation does not certify the memory or sustained CPU budgets.
+
+GPU validation: whole-system driver readings varied substantially with other applications running (roughly 25–85% across trials). A short on/paused comparison measured 48.6% versus 30.7%; this is not isolated per-app GPU attribution or an energy measurement. Animated effects have measurable compositor cost; negligible GPU/power overhead is **not certified**. A larger discrete-frame cache was rejected after RSS rose to approximately 184 MiB; the delivered build keeps the smaller interpolated cache. Use Ambient motion / Reduce Motion in Settings to trade decorative motion for lower rendering work.
+
+### Reactive visual modes
+
+Settings → Visual intensity defaults to **Balanced**. It keeps the rotating mesh and brief measurement-driven highlights plus the animated sidebar ribbon, while stopping other continuous waves/shimmer/travelling plot lights. **Minimal** removes atmosphere and telemetry transitions; **Cinematic** enables the richer decorative layer. Pausing, backgrounding, Reduce Motion, Low Power Mode and serious thermal state suppress motion. Increase Contrast strengthens panel outlines.
+
+Hover CPU/GPU/memory cards to spotlight the matching chart series. Amber now identifies elevated memory pressure and low storage. Click a recent event or its **Replay** button to inspect retained measurements around its timestamp; History plots and heatmap use the same two-minute window on either side. **Return to live** clears replay. Chart paths retain actual observed values; isolated newest-sample highlights soften updates without repeatedly redrawing the entire chart.
+
+Earlier performance numbers above predate the Balanced-default revision and must not be treated as certification of its CPU/GPU/energy or 60-fps interaction budgets.
+
+The 2026-11-04 app-scoped Time Profiler trace captured 16.85 seconds with zero potential hangs recorded. The Power Profiler attempt produced a malformed trace with missing run data, so it provides no usable energy/GPU evidence. Neither capture certifies sustained 60-fps interactions or the energy budget. The replay query is regression-tested to exclude measurements outside both ends of the selected interval.
+
+Final Balanced overview check (2026-11-04, 30.02 s after warmup): **2.23% of one CPU core; RSS 131.56 → 131.28 MiB**. The rejected SwiftUI pulse/whole-chart-crossfade revision measured 9.43% CPU and 176.94 → 207.16 MiB. Sample feedback now uses isolated Core Animation opacity layers; chart paths update only at publication cadence. The CPU target remains slightly exceeded. Native validation confirmed memory-warning replay, shared chart/heatmap time ranges, return-to-live, all three intensity choices, and automatic real Claude session expansion.
+
+The sidebar ribbon now animates in Balanced as explicitly requested: 23 gradient strands batched into two Core Animation masks, a nine-second cycle and a 6–10 fps compositor preference. Panel and sidebar edges have cyan/violet bloom and bright edge highlights rendered statically without full-panel blur. All existing motion/power/accessibility gates still apply. Static snapshots show a frozen ribbon.
+
+Sidebar-wave validation (2026-11-04): the Balanced wave-enabled release measured 2.10% of one core over 30.01 seconds; RSS 121.03 → 98.25 MiB. This was before the final static-edge softening and is a short process-only observation, not GPU/energy certification. Release compilation, signature verification and both native/static visual review passed.
+
+Sidebar particle pass (2026-11-05): 12 luminous tracers follow the deforming ribbon and eight dimmer motes drift around it. A shared nine-second phase keeps tracers attached to the strands; edge fades conceal wrapping. Twenty small, rasterized gradient sprites with three fine star glints replace any emitter or per-frame SwiftUI timer. Motion uses the existing 6–10 fps preference and all ambient gates. Static exports and Reduce Motion retain a still particle composition.
+
+Particle-release overhead check: 30.02 seconds, 2.13% of one CPU core, RSS 159.75 → 159.11 MiB. CPU and RSS remain above the engineering targets; this short run does not isolate GPU/WindowServer energy or establish a causal memory delta against earlier runs. Release compilation, signature verification and snapshot review passed.
+
+Audio-wave refinement: the sidebar uses 23 mirrored, tapered signal contours around a stable centre line, with overlapping harmonics and a breathing amplitude envelope. Particle positions use the same waveform geometry. The nine-second seamless cycle is precomputed in 49 shape keyframes; it does not listen to the microphone or represent actual audio. Balanced and all existing motion gates are preserved.
