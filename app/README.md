@@ -11,7 +11,7 @@ A working native macOS performance monitor with ARBITER's navy/cyan/violet inter
 ## Build and open
 
 ```sh
-cd /Users/cole/Workspace/ai-tools/arbiter-activity-monitor
+cd ~/Workspace/arbiter-activity-monitor/app
 swift test
 zsh scripts/build-app.sh
 open dist/arbiter-activity-monitor.app
@@ -121,7 +121,7 @@ The operator explicitly authorized **all local AI workspaces**. Prepared definit
 - Saved hook fields: random event ID, app, session ID, timestamp, event name, model slug, tool **name**, subagent ID. No prompt, command/tool arguments, output, transcript path, cwd, session title or credential is saved. Hook errors fail open with no stdout/context or policy decision.
 - CPU/RAM in AI Agents are explicitly labelled shared **app totals**; they are never attributed to a model/session without a trustworthy source. Tokens are cumulative per session where reported, not a live throughput estimate. “Turns seen” and tool counts cover retained events (bounded per session), not guaranteed all-day totals. Session graphs use real parent/subagent links and lifecycle events. Missing execution events remain clearly indicated.
 
-The hook commands look for `scripts/session-hook.py` under `arbiter-activity-monitor/` and then the pre-rename `arbiter-system/` in this checkout, and exit 0 when neither exists. A bare `python3 <missing file>` exits 2, which Claude Code treats as a blocking hook error on PreToolUse and UserPromptSubmit, so the commands must never fail when the checkout moves; the `arbiter-system` fallback can be dropped once no checkout uses that folder. Moving the checkout elsewhere still requires updating those hook entries. `integrations/` contains the exact definitions for review. Do not replace existing configuration files wholesale with these fragments.
+The hook commands look for `scripts/session-hook.py` under `arbiter-activity-monitor/` and then the pre-rename `arbiter-system/` in the ai-tools checkout (`/Users/cole/Workspace/ai-tools`), where the module lived before this repository, and exit 0 when neither exists. A bare `python3 <missing file>` exits 2, which Claude Code treats as a blocking hook error on PreToolUse and UserPromptSubmit, so the commands must never fail when the checkout moves; the `arbiter-system` fallback can be dropped once no checkout uses that folder. Moving the checkout elsewhere still requires updating those hook entries. `integrations/` contains the exact definitions for review. Do not replace existing configuration files wholesale with these fragments.
 
 Sources: [Codex lifecycle hooks](https://learn.chatgpt.com/docs/hooks), [Claude Code hooks](https://code.claude.com/docs/en/hooks), [Apple GPU driver statistics presentation](https://devstreaming-cdn.apple.com/videos/wwdc/2014/419xxli6f60a6bs/419/419_advanced_graphics_and_animation_performance.pdf?dl=1).
 

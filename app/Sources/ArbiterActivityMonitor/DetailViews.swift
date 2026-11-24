@@ -181,7 +181,7 @@ struct MonitorSettings: View {
                 Text("Claude / Codex session connections").font(.headline)
                 ForEach(store.sessionSources,id:\.self) {source in Label(source,systemImage:"checkmark.circle").foregroundStyle(HUD.green)}
                 Text("\(store.sessions.count) recent sessions. Local metadata provides identity/model where available. Lifecycle hooks add exact tool, turn and subagent events; recent timestamps alone never imply a running agent.").font(.system(size:12)).foregroundStyle(HUD.muted)
-                Text("Hook setup: arbiter-activity-monitor/integrations. Codex requires Review hooks in its composer or Settings > Hooks. No conversations, commands, tool output or credentials are saved.").font(.system(size:11)).foregroundStyle(HUD.muted)
+                Text("Hook setup: app/integrations. Codex requires Review hooks in its composer or Settings > Hooks. No conversations, commands, tool output or credentials are saved.").font(.system(size:11)).foregroundStyle(HUD.muted)
             }
             Form {
                 Picker("Foreground sampling", selection: $store.interval) {
