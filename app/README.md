@@ -17,7 +17,7 @@ zsh scripts/build-app.sh
 open dist/arbiter-activity-monitor.app
 ```
 
-The generated, ad-hoc-signed bundle is `dist/arbiter-activity-monitor.app`. It is intended for local use, not notarized public distribution. `zsh scripts/build-app.sh --dist` builds a universal (arm64 + x86_64) bundle and zips it to `dist/ARBITER-Activity-Monitor-0.1.0-macos-universal.zip` for sharing; it is still ad-hoc signed, so recipients must approve it once under System Settings → Privacy & Security → Open Anyway. The build generates a Retina icon. It does not install a login item, privileged helper, launch daemon or anything into `/Applications`. Opening `Package.swift` in Xcode also supports development. Build artifacts are ignored by git.
+The generated, ad-hoc-signed bundle is `dist/arbiter-activity-monitor.app`. It is intended for local use, not notarized public distribution. `zsh scripts/build-app.sh --dist` builds an Apple silicon (arm64) bundle and zips it to `dist/ARBITER-Activity-Monitor-0.1.0-macos-arm64.zip` for sharing (no Intel build: macOS is ending support for Intel-based apps, and the MLX and GPU features are Apple silicon only); it is still ad-hoc signed, so recipients must approve it once under System Settings → Privacy & Security → Open Anyway. The build generates a Retina icon. It does not install a login item, privileged helper, launch daemon or anything into `/Applications`. Opening `Package.swift` in Xcode also supports development. Build artifacts are ignored by git.
 
 ## Included
 

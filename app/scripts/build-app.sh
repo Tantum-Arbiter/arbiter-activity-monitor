@@ -1,9 +1,10 @@
 #!/bin/zsh
 set -euo pipefail
 cd "${0:A:h}/.."
-# --dist builds a universal (arm64 + x86_64) bundle and zips it for sharing.
+# --dist builds an Apple silicon (arm64) bundle and zips it for sharing. Intel is not built: macOS is ending
+# support for Intel-based apps and the MLX and GPU features are Apple silicon only.
 build_args=(-c release)
-[[ "${1:-}" == "--dist" ]] && build_args+=(--arch arm64 --arch x86_64)
+[[ "${1:-}" == "--dist" ]] && build_args+=(--arch arm64)
 swift build $build_args
 binary_dir="$(swift build $build_args --show-bin-path)"
 app_dir="$PWD/dist/arbiter-activity-monitor.app"
@@ -32,7 +33,7 @@ PLIST
 codesign --force --sign - "$app_dir"
 print "Built $app_dir"
 if [[ "${1:-}" == "--dist" ]]; then
-  zip_path="$PWD/dist/ARBITER-Activity-Monitor-0.1.0-macos-universal.zip"
+  zip_path="$PWD/dist/ARBITER-Activity-Monitor-0.1.0-macos-arm64.zip"
   rm -f "$zip_path"
   ditto -c -k --keepParent "$app_dir" "$zip_path"
   print "Packaged $zip_path"
