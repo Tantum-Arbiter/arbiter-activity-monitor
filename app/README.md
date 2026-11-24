@@ -24,9 +24,16 @@ The generated, ad-hoc-signed bundle is `dist/arbiter-activity-monitor.app`. It i
 The updater offers a release only when its tag is higher than the installed version, so the three must agree: `VERSION`, the tag `v<VERSION>`, and the asset name the build script produces.
 
 ```bash
-zsh scripts/build-app.sh --dist   # after raising VERSION
-gh release create "v$(<VERSION)" "dist/ARBITER-Activity-Monitor-$(<VERSION)-macos-arm64.zip" --target main
+zsh scripts/build-app.sh --dist                # after raising VERSION
+zsh scripts/release-notes.sh > dist/notes.md   # install instructions; add what changed at the top
+gh release create "v$(<VERSION)" "dist/ARBITER-Activity-Monitor-$(<VERSION)-macos-arm64.zip" --target main --notes-file dist/notes.md
 ```
+
+`scripts/release-notes.sh` prints the install section for the zip in `dist/`: a Terminal command that downloads the release, stops unless the SHA-256 matches, unpacks into Applications and opens the app, followed by the browser-download steps. Generate it from the exact zip being uploaded, because every build has a different checksum.
+
+### Installing a release
+
+A zip downloaded through a browser is marked by macOS, and because the build is not notarized the first open is blocked with "Apple could not verify … is free of malware". Either approve it once under System Settings → Privacy & Security → Open Anyway, or use the Terminal command on the [release page](https://github.com/Tantum-Arbiter/arbiter-activity-monitor/releases/latest): Terminal downloads are not marked, so macOS does not run its notarization check on that copy. Only a Developer ID signature and notarization would remove the warning for browser downloads. After the first install, Settings → Updates installs later versions without the warning.
 
 `dist/arbiter-activity-monitor.app/Contents/MacOS/arbiter-activity-monitor --check-update` prints the installed and latest versions; `--install-update` performs the same verified install without relaunching.
 
