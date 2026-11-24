@@ -36,11 +36,29 @@ enum Launcher {
             if let i=arguments.firstIndex(of:"--session"),arguments.indices.contains(i+1) {store.selectedSessionID=store.sessions.first {$0.id.hasPrefix(arguments[i+1])}?.id}
             // --inspect renders the session inspector for the selected (or first process-linked) session instead of the dashboard.
             if arguments.contains("--inspect") {store.inspectedSessionID=store.selectedSessionID ?? store.sessions.first {$0.pid != nil && $0.isRunning}?.id ?? store.sessions.first?.id}
-            let renderer=store.inspectedSessionID != nil ? ImageRenderer(content:AnyView(SessionInspector(store:store).environment(\.hudSnapshot,true))):ImageRenderer(content:AnyView(DashboardView(store:store,snapshotMode:true).frame(width:width,height:height)))
+            // --updates renders the Updates section of Settings after a real update check.
+            if arguments.contains("--updates") {await store.checkForUpdate()}
+            let renderer=arguments.contains("--updates") ? ImageRenderer(content:AnyView(UpdateSettings(store:store).padding(20).frame(width:900).background(HUD.background).foregroundStyle(HUD.text).preferredColorScheme(.dark).tint(HUD.cyan))):store.inspectedSessionID != nil ? ImageRenderer(content:AnyView(SessionInspector(store:store).environment(\.hudSnapshot,true))):ImageRenderer(content:AnyView(DashboardView(store:store,snapshotMode:true).frame(width:width,height:height)))
             renderer.scale=1
             guard let image=renderer.nsImage,let tiff=image.tiffRepresentation,let bitmap=NSBitmapImageRep(data:tiff),let data=bitmap.representation(using:.png,properties:[:]) else {print("Snapshot rendering failed");return}
             do {try data.write(to:URL(fileURLWithPath:arguments[index+1]));print("Snapshot saved from measured telemetry")} catch {print("Could not save snapshot")}
             await historyStore.close()
+            return
+        }
+        if arguments.contains("--check-update") || arguments.contains("--install-update") {
+            // Headless update check/install for verification. Installing here does not relaunch.
+            let installed = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+            guard let current = AppVersion(installed) else { print("This build has no version number"); return }
+            let updater = Updater(currentVersion: installed)
+            do {
+                let release = try await updater.latest()
+                print("Installed \(current) · latest \(release.version) · \(release.version > current ? "update available" : "up to date")")
+                guard arguments.contains("--install-update"), release.version > current else { return }
+                if let blocker = Updater.blocker(for: Bundle.main.bundleURL) { print(blocker); return }
+                let staged = try await updater.stage(release, for: Bundle.main.bundleURL, identifier: Bundle.main.bundleIdentifier ?? "")
+                try await updater.install(staged, over: Bundle.main.bundleURL)
+                print("Installed version \(release.version) after checksum and signature verification")
+            } catch { print((error as? UpdateError)?.errorDescription ?? error.localizedDescription) }
             return
         }
         if arguments.contains("--diagnostics") || arguments.contains("--benchmark") {

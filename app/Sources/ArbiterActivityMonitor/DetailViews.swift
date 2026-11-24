@@ -173,10 +173,47 @@ struct EventsPanel: View {
     }
 }
 
+struct UpdateSettings: View {
+    @Bindable var store: MonitorStore
+    private var busy: Bool { if case .installing = store.updateState { return true }; return store.updateState == .checking }
+    private var status: (text: String, color: Color, symbol: String) {
+        switch store.updateState {
+        case .idle: (store.lastUpdateCheck.map { "Last checked \($0.formatted(date: .abbreviated, time: .shortened))" } ?? "Not checked yet", HUD.muted, "clock")
+        case .checking: ("Checking for a newer version…", HUD.cyan, "arrow.triangle.2.circlepath")
+        case .upToDate: ("Version \(store.appVersion) is the latest", HUD.green, "checkmark.circle")
+        case .available(let release): ("Version \(release.version) is available · \(bytes(UInt64(release.size)))", HUD.amber, "arrow.down.circle")
+        case .installing(let release): ("Downloading and verifying version \(release.version)…", HUD.cyan, "arrow.down.circle")
+        case .failed(let reason): (reason, HUD.amber, "exclamationmark.triangle")
+        }
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Updates").font(.headline)
+            HStack(spacing: 10) {
+                Text("Installed version \(store.appVersion.isEmpty ? "unknown" : store.appVersion)").font(.system(size: 12, weight: .medium)).monospacedDigit()
+                Label(status.text, systemImage: status.symbol).font(.system(size: 12)).foregroundStyle(status.color).lineLimit(2)
+                Spacer(minLength: 4)
+                if busy { ProgressView().controlSize(.small) }
+                if case .available = store.updateState {
+                    Button("Install and relaunch", systemImage: "arrow.down.circle") { Task { await store.installUpdate() } }.disabled(store.updateBlocker != nil)
+                }
+                Button("Check now", systemImage: "arrow.triangle.2.circlepath") { Task { await store.checkForUpdate() } }.disabled(busy || store.updateBlocker != nil)
+            }
+            if let blocker = store.updateBlocker { Label(blocker, systemImage: "info.circle").font(.system(size: 11)).foregroundStyle(HUD.amber) }
+            Toggle("Check for updates automatically, once a day", isOn: $store.autoCheckUpdates).disabled(store.updateBlocker != nil)
+            Toggle("Install updates automatically and relaunch", isOn: $store.autoInstallUpdates).disabled(!store.autoCheckUpdates || store.updateBlocker != nil)
+            Text("Reads the public release list at github.com/Tantum-Arbiter/arbiter-activity-monitor. A download is installed only if it matches the published SHA-256 checksum, is this app, carries the advertised version and has an intact code signature. Nothing about this Mac or your sessions is sent. Both switches are off until you turn them on.")
+                .font(.system(size: 11)).foregroundStyle(HUD.muted)
+        }
+    }
+}
+
 struct MonitorSettings: View {
     @Bindable var store: MonitorStore
     var body: some View {
-        Panel(title: "Monitoring settings", subtitle: "LOCAL ONLY · NO ACCOUNT · NO ADMINISTRATOR ACCESS") {
+        Panel(title: "Monitoring settings", subtitle: "NO ACCOUNT · NO ADMINISTRATOR ACCESS · NETWORK ONLY FOR UPDATE CHECKS") {
+            UpdateSettings(store: store)
+            Divider()
             VStack(alignment:.leading,spacing:8) {
                 Text("Claude / Codex session connections").font(.headline)
                 ForEach(store.sessionSources,id:\.self) {source in Label(source,systemImage:"checkmark.circle").foregroundStyle(HUD.green)}

@@ -37,6 +37,12 @@ enum Destination: String, CaseIterable, Identifiable {
     }
 }
 
+enum UpdateState: Equatable {
+    case idle, checking, upToDate
+    case available(ReleaseInfo), installing(ReleaseInfo)
+    case failed(String)
+}
+
 struct ProcessObservation: Identifiable {
     let id: Date
     let value: ProcessSample
@@ -93,6 +99,46 @@ final class MonitorStore {
     @ObservationIgnored private var eventRevision = 0
     @ObservationIgnored private var observedApps = Set<AgentApp>()
 
+    // Updates: the only network access in the app, and only when asked or when the daily check is switched on.
+    let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+    var updateState = UpdateState.idle
+    var lastUpdateCheck = UserDefaults.standard.object(forKey: "lastUpdateCheck") as? Date
+    var autoCheckUpdates = UserDefaults.standard.bool(forKey: "autoCheckUpdates") { didSet { if persistPreferences { UserDefaults.standard.set(autoCheckUpdates, forKey: "autoCheckUpdates") } } }
+    var autoInstallUpdates = UserDefaults.standard.bool(forKey: "autoInstallUpdates") { didSet { if persistPreferences { UserDefaults.standard.set(autoInstallUpdates, forKey: "autoInstallUpdates") } } }
+    var updateBlocker: String? { AppVersion(appVersion) == nil ? "This build has no version number" : Updater.blocker(for: Bundle.main.bundleURL) }
+    @ObservationIgnored private lazy var updater = Updater(currentVersion: appVersion)
+    @ObservationIgnored private var updateTask: Task<Void, Never>?
+
+    func checkForUpdate() async {
+        guard let current = AppVersion(appVersion), updateState != .checking else { return }
+        if case .installing = updateState { return }
+        updateState = .checking
+        do {
+            let release = try await updater.latest()
+            lastUpdateCheck = Date()
+            if persistPreferences { UserDefaults.standard.set(lastUpdateCheck, forKey: "lastUpdateCheck") }
+            updateState = release.version > current ? .available(release) : .upToDate
+        } catch { updateState = .failed((error as? UpdateError)?.errorDescription ?? error.localizedDescription) }
+    }
+
+    /// Downloads, verifies and swaps in the new build, then relaunches into it.
+    func installUpdate() async {
+        guard case .available(let release) = updateState else { return }
+        if let updateBlocker { updateState = .failed(updateBlocker); return }
+        updateState = .installing(release)
+        let bundle = Bundle.main.bundleURL
+        do {
+            let staged = try await updater.stage(release, for: bundle, identifier: Bundle.main.bundleIdentifier ?? "")
+            try await updater.install(staged, over: bundle)
+            record("Updated to version \(release.version)", warning: false)
+            let relaunch = Process()
+            relaunch.executableURL = URL(fileURLWithPath: "/bin/sh")
+            relaunch.arguments = ["-c", "sleep 1; exec /usr/bin/open -n \"$0\"", bundle.path]
+            try relaunch.run()
+            NSApplication.shared.terminate(nil)
+        } catch { updateState = .failed((error as? UpdateError)?.errorDescription ?? error.localizedDescription) }
+    }
+
     private(set) var workloads: [Workload] = []
     var selectedProcess: ProcessSample? { latest?.processes.first { $0.id == selectedProcessID } }
     var chartHistory: [SystemSample] {
@@ -131,6 +177,15 @@ final class MonitorStore {
 
     func start() {
         guard task == nil else { return }
+        updateTask = Task { [weak self] in
+            while !Task.isCancelled {
+                if let self, self.autoCheckUpdates, self.updateBlocker == nil, Date().timeIntervalSince(self.lastUpdateCheck ?? .distantPast) >= 86400 {
+                    await self.checkForUpdate()
+                    if self.autoInstallUpdates, case .available = self.updateState { await self.installUpdate() }
+                }
+                do { try await Task.sleep(for: .seconds(3600)) } catch { return }
+            }
+        }
         task = Task { [weak self] in
             if let self {
                 self.history = (try? await self.historyStore.load(seconds: 900)) ?? []

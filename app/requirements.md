@@ -97,6 +97,7 @@ The operator's visual-alignment request enables the ambient orbit by default. Br
 | Sensors | Separate optional adapter boundary | Temperature, fan and power unavailable; no sudo/powermetrics daemon |
 | MLX runtimes | Mapped library names of the user's Python interpreters via `PROC_PIDREGIONPATHINFO` | Presence of the MLX runtime only (`libmlx.dylib`, `mlx/core.*.so`); model, tokens and task state unavailable; no arguments, environment or file contents |
 | Observed harness | Session PID (Claude metadata, MLX detection) + parent/child process links + lifecycle events | Harness process tree, reported tools and subagents; hover facts and Session inspector; no inferred stages, no conversation content |
+| Updates | GitHub release feed over HTTPS, on request or opt-in daily | Latest version tag and asset checksum; download verified by SHA-256, bundle identifier, version and code signature before an in-place swap; nothing sent about the Mac |
 | Workloads | Executable roots + nearest observed parent chain | Detect Codex, Claude, Ollama, MLX, Blender, Python, Node, FFmpeg, VS Code; explicit PID+start tracking can override grouping |
 | Health | Memory/thermal state plus sustained CPU saturation | Critical only for critical memory/thermal; busy CPU alone at most Under Pressure; incomplete readings Unknown |
 
