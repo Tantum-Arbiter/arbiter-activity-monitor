@@ -98,6 +98,9 @@ The operator's visual-alignment request enables the ambient orbit by default. Br
 | MLX runtimes | Mapped library names of the user's Python interpreters via `PROC_PIDREGIONPATHINFO` | Presence of the MLX runtime only (`libmlx.dylib`, `mlx/core.*.so`); model, tokens and task state unavailable; no arguments, environment or file contents |
 | Observed harness | Session PID (Claude metadata, MLX detection) + parent/child process links + lifecycle events | Harness process tree, reported tools and subagents; hover facts and Session inspector; no inferred stages, no conversation content |
 | Updates | GitHub release feed over HTTPS, on request or opt-in daily | Latest version tag and asset checksum; download verified by SHA-256, bundle identifier, version and code signature before an in-place swap; nothing sent about the Mac |
+| Process control | Operator selection + confirmation; `NSRunningApplication.terminate/forceTerminate`, else SIGTERM/SIGKILL | PID + start time re-checked before signalling; no elevation; macOS-critical, other-user and self processes refused; outcome logged |
+| Token usage | Codex `tokens_used` per thread; hook Stop / PostToolUse counts | Cumulative tokens per task, turns, tool calls, tokens per turn; Claude Code tokens unavailable (not reported by metadata or hooks) |
+| LLM benchmark | Loopback HTTP to installed local runtimes; footprint of the listening process tree | TTFT, prompt and generation tok/s (runtime-reported for Ollama, client-timed for OpenAI-compatible), completion tokens, peak memory; medians of measured runs, warm-up excluded |
 | Workloads | Executable roots + nearest observed parent chain | Detect Codex, Claude, Ollama, MLX, Blender, Python, Node, FFmpeg, VS Code; explicit PID+start tracking can override grouping |
 | Health | Memory/thermal state plus sustained CPU saturation | Critical only for critical memory/thermal; busy CPU alone at most Under Pressure; incomplete readings Unknown |
 

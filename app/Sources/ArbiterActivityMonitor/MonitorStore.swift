@@ -16,7 +16,7 @@ struct MonitorEvent: Identifiable, Codable {
 }
 
 enum Destination: String, CaseIterable, Identifiable {
-    case overview = "Overview", cpu = "CPU", gpu = "GPU", memory = "Memory", storage = "Storage", network = "Network", battery = "Battery", thermals = "Thermals", processes = "Processes", workloads = "Workloads", history = "History", alerts = "Alerts", settings = "Settings"
+    case overview = "Overview", cpu = "CPU", gpu = "GPU", memory = "Memory", storage = "Storage", network = "Network", battery = "Battery", thermals = "Thermals", processes = "Processes", workloads = "Workloads", models = "Models", history = "History", alerts = "Alerts", settings = "Settings"
     var id: String { rawValue }
     var symbol: String {
         switch self {
@@ -30,6 +30,7 @@ enum Destination: String, CaseIterable, Identifiable {
         case .thermals: "thermometer.medium"
         case .processes: "list.bullet.rectangle"
         case .workloads: "point.3.connected.trianglepath.dotted"
+        case .models: "gauge.with.dots.needle.50percent"
         case .history: "chart.xyaxis.line"
         case .alerts: "bell"
         case .settings: "slider.horizontal.3"
@@ -140,6 +141,34 @@ final class MonitorStore {
     }
 
     private(set) var workloads: [Workload] = []
+
+    // Process control: a pending confirmation and the last outcome shown on screen.
+    var quitRequest: QuitRequest?
+    var notice: String?
+    @ObservationIgnored var noticeTask: Task<Void, Never>?
+
+    // Local LLM benchmark (loopback only) and its stored results.
+    var llmEndpoints: [LLMEndpoint] = MonitorStore.savedEndpoints() { didSet { if persistPreferences { UserDefaults.standard.set(llmEndpoints.map { Int($0.port) }, forKey: "llmPorts") } } }
+    var llmModels: [LLMModel] = []
+    var llmStatus: [String: String] = [:]
+    var llmSelected = Set<String>()
+    var llmPrompt = UserDefaults.standard.string(forKey: "llmPrompt") ?? "short" { didSet { if persistPreferences { UserDefaults.standard.set(llmPrompt, forKey: "llmPrompt") } } }
+    var llmRepeats = UserDefaults.standard.object(forKey: "llmRepeats") as? Int ?? 3 { didSet { if persistPreferences { UserDefaults.standard.set(llmRepeats, forKey: "llmRepeats") } } }
+    var llmProbing = false
+    var benchmarkRuns: [BenchmarkRun] = []
+    var benchmarkProgress: String?
+    var benchmarkError: String?
+    @ObservationIgnored var benchmarkTask: Task<Void, Never>?
+    @ObservationIgnored let benchmarkRunner = BenchmarkRunner()
+    @ObservationIgnored let benchmarkStore = BenchmarkStore()
+    static func savedEndpoints() -> [LLMEndpoint] {
+        let ports = UserDefaults.standard.array(forKey: "llmPorts") as? [Int] ?? []
+        return LLMEndpoint.defaults.enumerated().map { index, endpoint in
+            var endpoint = endpoint
+            if ports.indices.contains(index), (1...65535).contains(ports[index]) { endpoint.port = UInt16(ports[index]) }
+            return endpoint
+        }
+    }
     var selectedProcess: ProcessSample? { latest?.processes.first { $0.id == selectedProcessID } }
     var chartHistory: [SystemSample] {
         let cutoff = (latest?.id ?? Date()).addingTimeInterval(-range)
@@ -197,6 +226,7 @@ final class MonitorStore {
                     }
                 }
                 self.record("Local monitoring started", warning: false)
+                self.benchmarkRuns = await self.benchmarkStore.load()
             }
             while !Task.isCancelled {
                 guard let self else { return }
@@ -283,7 +313,7 @@ final class MonitorStore {
         Task { try? await historyStore.saveEvents(data, revision: revision) }
     }
 
-    private func record(_ message: String, warning: Bool) {
+    func record(_ message: String, warning: Bool) {
         events.insert(MonitorEvent(message: message, warning: warning), at: 0)
         if events.count > 100 { events.removeLast(events.count - 100) }
         persistEvents()

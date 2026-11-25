@@ -33,6 +33,11 @@ enum Launcher {
             let width=dimension("--width",default:arguments.contains("--compact") ? 900.0:1586.0)
             let height=dimension("--height",default:arguments.contains("--compact") ? 2800.0:992.0)
             if let i=arguments.firstIndex(of:"--hover"),arguments.indices.contains(i+1) {store.previewHover=arguments[i+1]}
+            // --destination renders another page (for example Models or Processes) instead of the overview.
+            if let i=arguments.firstIndex(of:"--destination"),arguments.indices.contains(i+1),let page=Destination.allCases.first(where:{$0.rawValue.lowercased()==arguments[i+1].lowercased()}) {
+                store.destination=page
+                if page == .models {store.benchmarkRuns=await store.benchmarkStore.load();await store.probeRuntimes()}
+            }
             if let i=arguments.firstIndex(of:"--session"),arguments.indices.contains(i+1) {store.selectedSessionID=store.sessions.first {$0.id.hasPrefix(arguments[i+1])}?.id}
             // --inspect renders the session inspector for the selected (or first process-linked) session instead of the dashboard.
             if arguments.contains("--inspect") {store.inspectedSessionID=store.selectedSessionID ?? store.sessions.first {$0.pid != nil && $0.isRunning}?.id ?? store.sessions.first?.id}
@@ -59,6 +64,10 @@ enum Launcher {
                 try await updater.install(staged, over: Bundle.main.bundleURL)
                 print("Installed version \(release.version) after checksum and signature verification")
             } catch { print((error as? UpdateError)?.errorDescription ?? error.localizedDescription) }
+            return
+        }
+        if arguments.contains("--llm-runtimes") || arguments.contains("--benchmark-llm") {
+            await llmCommand(arguments)
             return
         }
         if arguments.contains("--diagnostics") || arguments.contains("--benchmark") {
@@ -100,6 +109,31 @@ enum Launcher {
         NSApplication.shared.setActivationPolicy(.regular)
         ArbiterActivityMonitorApp.main()
     }
+}
+
+/// `--llm-runtimes` lists local runtimes and installed models; `--benchmark-llm <model> [--prompt short|medium|long] [--runs N]`
+/// benchmarks models whose name contains <model>, saves the runs with the app's results and prints a Markdown table.
+@MainActor func llmCommand(_ arguments: [String]) async {
+    func value(_ flag: String) -> String? { arguments.firstIndex(of: flag).flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil } }
+    let store = MonitorStore(persistPreferences: false)
+    await store.probeRuntimes()
+    for endpoint in store.llmEndpoints { print("\(endpoint.name) :\(endpoint.port) · \(store.llmStatus[endpoint.id] ?? "Not checked")") }
+    for model in store.llmModels { print("  \(model.endpoint.name) · \(model.name) · \(model.detail ?? "quantization not reported")") }
+    guard let filter = value("--benchmark-llm") else { return }
+    store.llmSelected = Set(store.llmModels.filter { $0.name.localizedCaseInsensitiveContains(filter) }.map(\.id))
+    guard !store.llmSelected.isEmpty else { print("No installed model matches \(filter)"); return }
+    store.llmPrompt = value("--prompt") ?? "short"
+    store.llmRepeats = Int(value("--runs") ?? "") ?? 3
+    store.benchmarkRuns = await store.benchmarkStore.load()
+    let before = Set(store.benchmarkRuns.map(\.id))
+    store.startBenchmark()
+    while store.benchmarkTask != nil { try? await Task.sleep(for: .milliseconds(200)) }
+    let runs = store.benchmarkRuns.filter { !before.contains($0.id) }
+    for run in runs {
+        print("\(run.warmup ? "warm-up" : "run    ") \(run.model) · ttft \(run.ttft.map { String(format: "%.2f s", $0) } ?? "—") · gen \(run.generationRate.map { String(format: "%.1f tok/s", $0) } ?? "—") · prompt \(run.promptRate.map { String(format: "%.0f tok/s", $0) } ?? "—") · \(run.completionTokens ?? 0) tokens · peak \(run.peakMemory.map(bytes) ?? "—")\(run.error.map { " · " + $0 } ?? "")")
+    }
+    print("")
+    print(BenchmarkReport.markdown(BenchmarkReport.summaries(runs), hardware: hardware()))
 }
 
 struct ArbiterActivityMonitorApp: App {

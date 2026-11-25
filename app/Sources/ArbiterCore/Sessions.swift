@@ -15,6 +15,9 @@ public struct AgentSession: Identifiable, Sendable, Equatable {
     public var events: [SessionEvent] = []
     /// PID of the harness process, when the session's own metadata reports one.
     public var pid: Int32?
+    /// Completed turns (Stop events) and tool calls recorded by lifecycle hooks in the last 24 hours; nil without hook events.
+    public var turnCount: Int?
+    public var toolCount: Int?
     public var isRunning: Bool { ["Running", "Tool running", "Working"].contains(status) }
 }
 
@@ -78,6 +81,8 @@ public actor SessionMonitor {
             }
             guard let index = result.sessions.firstIndex(where: { $0.app.rawValue + ":" + $0.id == key }) else { continue }
             result.sessions[index].events = Array(ordered.suffix(120))
+            result.sessions[index].turnCount = ordered.filter { $0.event == "Stop" }.count
+            result.sessions[index].toolCount = ordered.filter { $0.event == "PostToolUse" || $0.event == "PostToolUseFailure" }.count
             if let model = ordered.last(where: { $0.model != nil })?.model { result.sessions[index].model = model }
             if last.date >= result.sessions[index].updated {
                 result.sessions[index].updated = last.date

@@ -131,11 +131,15 @@ struct ReferenceThroughput: View {
 struct ReferenceProcesses: View {
     let sample:SystemSample?
     let inspect:(ProcessSample)->Void
+    var quit:(([ProcessSample],QuitMode)->Void)?
     @State private var scope="All"
+    @AppStorage("overviewProcessSort") private var sort=ConsumptionSort.cpu
+    @State private var selection=Set<String>()
     private var rows:[ProcessSample] {
         (sample?.processes ?? []).filter {scope=="All" || scope=="System" && !$0.user || scope=="Agents" && $0.agent != nil || scope=="User" && $0.user}
-            .sorted{($0.cpu ?? -1)==($1.cpu ?? -1) ? $0.pid<$1.pid : ($0.cpu ?? -1)>($1.cpu ?? -1)}
+            .sorted(by:sort)
     }
+    private var selected:[ProcessSample] {(sample?.processes ?? []).filter{selection.contains($0.id)}}
     var body:some View {
         ReferencePanel(title:"Processes & Tasks",subtitle:"System processes, apps, and local workloads") {
             HStack(spacing:0) {
@@ -143,9 +147,18 @@ struct ReferenceProcesses: View {
                     Button {scope=item} label:{Text(item).font(.system(size:9,weight:.medium)).frame(maxWidth:.infinity).padding(.vertical,6).background(scope==item ? LinearGradient(colors:[Color(hex:0x2575ff),Color(hex:0x2068af)],startPoint:.top,endPoint:.bottom) : LinearGradient(colors:[.clear,.clear],startPoint:.top,endPoint:.bottom),in:RoundedRectangle(cornerRadius:8)).overlay(RoundedRectangle(cornerRadius:8).strokeBorder(scope==item ? HUD.cyan.opacity(0.7):.clear,lineWidth:0.7))}.buttonStyle(.plain)
                 }
             }.padding(3).background(.white.opacity(0.045),in:RoundedRectangle(cornerRadius:10)).overlay(RoundedRectangle(cornerRadius:10).strokeBorder(HUD.cyan.opacity(0.2),lineWidth:0.7))
-            HStack{Text("Name").frame(maxWidth:.infinity,alignment:.leading);Text("Type").frame(width:43);Text("CPU").frame(width:42);Text("Memory").frame(width:64);Text("State").frame(width:52)}.font(.system(size:9)).foregroundStyle(Color(hex:0xb6ccda))
+            HStack{
+                if quit != nil {Color.clear.frame(width:14)}
+                Text("Name").frame(maxWidth:.infinity,alignment:.leading);Text("Type").frame(width:43)
+                SortHeader(title:"CPU",active:sort == .cpu){sort = .cpu}.frame(width:42)
+                SortHeader(title:"Memory",active:sort == .memory){sort = .memory}.frame(width:64)
+                Text("State").frame(width:52)
+            }.font(.system(size:9)).foregroundStyle(Color(hex:0xb6ccda))
+            if let quit,!selected.isEmpty {QuitBar(count:selected.count,clear:{selection=[]}){mode in quit(selected,mode)}}
             VStack(spacing:0) {
-                ForEach(Array(rows.prefix(7))){ p in
+                ForEach(Array(rows.prefix(selected.isEmpty ? 7:6))){ p in
+                    HStack(spacing:0) {
+                    if quit != nil {SelectBox(selected:selection.contains(p.id)){if selection.contains(p.id) {selection.remove(p.id)} else {selection.insert(p.id)}}.frame(width:14)}
                     Button {inspect(p)} label:{
                         HStack(spacing:5){
                             Image(systemName:p.agent != nil ? "terminal":"square.stack.3d.up").foregroundStyle(p.agent != nil ? HUD.purple:HUD.muted).frame(width:18)
@@ -155,7 +168,8 @@ struct ReferenceProcesses: View {
                             Text(p.memory.map(bytes) ?? "—").frame(width:64)
                             Text(p.state).font(.system(size:8)).foregroundStyle(HUD.green).frame(width:52)
                         }.font(.system(size:10)).monospacedDigit().padding(.vertical,6)
-                    }.buttonStyle(HUDRowStyle()).modifier(HoverLight())
+                    }.buttonStyle(HUDRowStyle()).modifier(HoverLight()).modifier(QuitMenu(processes:[p],quit:quit))
+                    }
                     Divider().opacity(0.22)
                 }
             }

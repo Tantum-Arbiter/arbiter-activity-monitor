@@ -35,4 +35,12 @@ int as_topology(int level);
    Compares mapped file names only: no arguments, environment, file contents or model files are read. */
 int as_process_maps_mlx(int32_t pid);
 int as_path_is_mlx_runtime(const char *path);
+/* Start time in microseconds since 1970 (the ASProcess.start encoding), or 0 when the process is gone or unreadable. */
+uint64_t as_process_start(int32_t pid);
+/* Physical footprint in bytes (Activity Monitor's Memory column, including GPU allocations charged to the task), or 0 when unreadable. */
+uint64_t as_process_footprint(int32_t pid);
+/* PID of a current-user process with a TCP socket listening on this port, or 0 when none is found. Reads socket metadata only. */
+int32_t as_listening_pid(uint16_t port);
+/* Footprint of pid plus its descendants (depth 4, at most 64 processes): a runtime server and its model runners. 0 when unreadable. */
+uint64_t as_tree_footprint(int32_t pid);
 #endif

@@ -25,7 +25,7 @@ struct ReferenceOverview: View {
                     SessionThroughput(sessions:store.sessions)
                 }.frame(height:chartHeight)
                 HStack(spacing:12) {
-                    ReferenceProcesses(sample:store.latest,inspect:store.inspect).frame(width:usable*0.30)
+                    ReferenceProcesses(sample:store.latest,inspect:store.inspect,quit:store.requestQuit).frame(width:usable*0.30)
                     AgentOrchestration(store:store).frame(width:usable*0.42)
                     ReferenceEvents(alerts:store.alerts,events:store.events,replay:store.replay,open:{store.destination = .alerts})
                 }.frame(height:lowerHeight)
@@ -40,7 +40,7 @@ struct ReferenceOverview: View {
                 }.frame(height:360)
                 HistoryPanel(history:store.chartHistory,height:180,spotlight:store.spotlight)
                 HStack(spacing:12) {
-                    ReferenceProcesses(sample:store.latest,inspect:store.inspect)
+                    ReferenceProcesses(sample:store.latest,inspect:store.inspect,quit:store.requestQuit)
                     ReferenceEvents(alerts:store.alerts,events:store.events,replay:store.replay,open:{store.destination = .alerts})
                 }.frame(height:320)
                 HStack(spacing:12){ReferenceHeatmap(history:store.chartHistory);SessionThroughput(sessions:store.sessions)}.frame(height:180)
@@ -53,7 +53,7 @@ struct ReferenceOverview: View {
                 SessionAgentsPanel(store:store).frame(height:387)
                 HistoryPanel(history:store.chartHistory,spotlight:store.spotlight)
                 HStack(spacing:12){ReferenceHeatmap(history:store.chartHistory);SessionThroughput(sessions:store.sessions)}.frame(height:180)
-                ReferenceProcesses(sample:store.latest,inspect:store.inspect).frame(height:320)
+                ReferenceProcesses(sample:store.latest,inspect:store.inspect,quit:store.requestQuit).frame(height:320)
                 AgentOrchestration(store:store).frame(height:344)
                 ReferenceEvents(alerts:store.alerts,events:store.events,replay:store.replay,open:{store.destination = .alerts}).frame(height:312)
             }

@@ -6,7 +6,7 @@ phase: build
 
 # arbiter-activity-monitor
 
-Native, read-only macOS system and AI workload monitor. Read root AGENTS.md first.
+Native macOS system and AI workload monitor. Read-only except the operator-initiated Quit / Force Quit described below. Read root AGENTS.md first.
 
 - Swift 6, macOS 14+, SwiftUI and system frameworks only. No package dependencies.
 - Keep collectors off the main actor; bounded history and sampling, no shell polling.
@@ -22,5 +22,8 @@ Native, read-only macOS system and AI workload monitor. Read root AGENTS.md firs
 - UI display name: ARBITER Activity Monitor. Fit the window to its attached display, reflow at local width breakpoints, and keep orchestration nodes non-overlapping. Animate measured gauges in isolated Core Animation layers; never reintroduce full-dashboard frame timers. Collapse inactive sessions separately from unconfirmed activity. Match Mission Control’s 30/150-point cyan grid.
 - Tests: `swift test`; release build: `scripts/build-app.sh`. Document metric semantics and limitations in README.md and requirements.md.
 - Generated `.build/`, `dist/`, runtime telemetry and screenshots stay untracked. Do not add privileged helpers, auto-start, networking or agent-log scraping without operator approval. The one approved network use is the updater in `ArbiterCore/Updater.swift` (GitHub release feed and asset download): keep it opt-in, send nothing about the Mac, and never install a download that fails the checksum, bundle identifier, version or code-signature checks.
+- Process control (operator-approved): only `ProcessControl` in ArbiterCore may signal processes, only after the operator selects them and confirms the `QuitConfirmation` dialog. Re-check PID + start time immediately before signalling; never elevate; keep launchd, kernel_task, WindowServer, loginwindow, other users' processes and this monitor refused. Never quit anything automatically, from a timer, an alert or a hook event.
+- Local LLM benchmark (operator-approved loopback networking): `BenchmarkRunner` talks only to `127.0.0.1` ports of local runtimes (Ollama native API, OpenAI-compatible servers). Send only the fixed built-in prompts in `BenchmarkPrompt`; never send session, file, clipboard or system data; never pull, download or load a model the runtime does not already list; run only when the operator presses Run (or the `--benchmark-llm` command). Store model names and measurements only.
+- Token usage comes only from what agents report (Codex `tokens_used`); never estimate tokens from CPU, time or transcripts. Unreported is shown as Not reported.
 - The version lives in `VERSION`; a release must be tagged `v<VERSION>` with the `-macos-arm64.zip` asset the build script produces, or the updater will not offer it.
 - Balanced is the default visual intensity. The operator explicitly requested the sidebar ribbon in Balanced; reserve other persistent decorative waves/glints for Cinematic; prefer bounded measurement-triggered feedback. Minimal, Reduce Motion, inactivity, low power and serious thermal pressure suppress motion. Replay is a shared retained-data time window, never fabricated historical values.

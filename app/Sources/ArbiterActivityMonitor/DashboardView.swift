@@ -25,18 +25,10 @@ struct DashboardView: View {
                                 ReferenceOverview(store:store,width:geometry.size.width-(narrow ? 69:151)-24,height:geometry.size.height-82).padding(.horizontal,12).padding(.vertical,14)
                             }
                         }
+                    } else if snapshotMode {
+                        page(width:geometry.size.width-(narrow ? 69:151)-40).frame(maxHeight:.infinity,alignment:.top)
                     } else {
-                        ScrollView {
-                            VStack(alignment:.leading,spacing:16) {
-                                HStack {
-                                    Text(store.destination.rawValue).font(.system(size:22,weight:.medium))
-                                    Spacer()
-                                    Button {store.paused.toggle()} label:{Label(store.paused ? "Resume":"Pause",systemImage:store.paused ? "play":"pause")}
-                                }
-                                content(width:geometry.size.width-(narrow ? 69:151)-40)
-                                Text(store.latest.map {"Last sample \($0.id.formatted(date:.omitted,time:.standard)) · \(Int(store.actualInterval))s collection"} ?? "Waiting for first sample").font(.caption).foregroundStyle(HUD.muted)
-                            }.padding(20)
-                        }
+                        ScrollView { page(width:geometry.size.width-(narrow ? 69:151)-40) }
                     }
                 }
             }
@@ -53,6 +45,26 @@ struct DashboardView: View {
         .onChange(of: scenePhase) { _, phase in store.active = phase == .active }
         .sheet(isPresented: Binding(get: { store.selectedProcessID != nil }, set: { if !$0 { store.selectedProcessID = nil } })) { ProcessInspector(store: store) }
         .sheet(isPresented: Binding(get: { store.inspectedSessionID != nil }, set: { if !$0 { store.inspectedSessionID = nil } })) { SessionInspector(store: store) }
+        .modifier(QuitConfirmation(store: store))
+        .overlay(alignment: .top) {
+            if let notice = store.notice {
+                Label(notice, systemImage: "info.circle").font(.system(size: 11, weight: .medium)).padding(.horizontal, 14).padding(.vertical, 8)
+                    .background(HUD.panel, in: Capsule()).overlay(Capsule().strokeBorder(HUD.cyan.opacity(0.4))).padding(.top, 62)
+                    .transition(.opacity).onTapGesture { store.notice = nil }
+            }
+        }
+    }
+
+    private func page(width: CGFloat) -> some View {
+        VStack(alignment:.leading,spacing:16) {
+            HStack {
+                Text(store.destination.rawValue).font(.system(size:22,weight:.medium))
+                Spacer()
+                Button {store.paused.toggle()} label:{Label(store.paused ? "Resume":"Pause",systemImage:store.paused ? "play":"pause")}
+            }
+            content(width:width)
+            Text(store.latest.map {"Last sample \($0.id.formatted(date:.omitted,time:.standard)) · \(Int(store.actualInterval))s collection"} ?? "Waiting for first sample").font(.caption).foregroundStyle(HUD.muted)
+        }.padding(20)
     }
 
     private var healthColor: Color {
@@ -142,6 +154,7 @@ struct DashboardView: View {
         case .overview: ReferenceOverview(store:store,width:width)
         case .processes: ProcessesView(store: store)
         case .workloads: WorkloadsView(store: store)
+        case .models: ModelsView(store: store)
         case .history:
             if let date=store.replayDate {
                 HStack {Label("Event replay · \(date.formatted()) · ±2 minutes",systemImage:"clock.arrow.circlepath");Spacer();Button("Return to live") {store.replayDate=nil;store.range=900}}

@@ -19,6 +19,7 @@
 #include <mach/mach_time.h>
 #include <net/route.h>
 #include <math.h>
+#include <arpa/inet.h>
 
 static uint64_t dictionary_number(CFDictionaryRef d, CFStringRef key) {
     int64_t value = 0;
@@ -261,4 +262,57 @@ int as_process_sample(ASProcess *out, int capacity) {
     }
     free(pids);
     return result < 0 ? -1 : written;
+}
+
+uint64_t as_process_start(int32_t pid) {
+    struct proc_bsdinfo bsd;
+    if (pid <= 0 || proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &bsd, sizeof(bsd)) != sizeof(bsd)) return 0;
+    return bsd.pbi_start_tvsec * 1000000ULL + bsd.pbi_start_tvusec;
+}
+
+uint64_t as_process_footprint(int32_t pid) {
+    struct rusage_info_v2 usage = {0};
+    if (pid <= 0 || proc_pid_rusage(pid, RUSAGE_INFO_V2, (rusage_info_t *)&usage)) return 0;
+    return usage.ri_phys_footprint;
+}
+
+int32_t as_listening_pid(uint16_t port) {
+    int bytes = proc_listpids(PROC_UID_ONLY, getuid(), NULL, 0);
+    if (bytes <= 0 || port == 0) return 0;
+    int slots = bytes / (int)sizeof(pid_t) + 64;
+    pid_t *pids = calloc((size_t)slots, sizeof(pid_t));
+    if (!pids) return 0;
+    int count = proc_listpids(PROC_UID_ONLY, getuid(), pids, slots * (int)sizeof(pid_t)) / (int)sizeof(pid_t);
+    int32_t found = 0;
+    struct proc_fdinfo fds[1024];
+    for (int i = 0; i < count && !found; i++) {
+        if (pids[i] <= 0) continue;
+        int size = proc_pidinfo(pids[i], PROC_PIDLISTFDS, 0, fds, sizeof(fds));
+        if (size <= 0) continue;
+        for (int f = 0; f < size / (int)sizeof(struct proc_fdinfo); f++) {
+            if (fds[f].proc_fdtype != PROX_FDTYPE_SOCKET) continue;
+            struct socket_fdinfo info;
+            if (proc_pidfdinfo(pids[i], fds[f].proc_fd, PROC_PIDFDSOCKETINFO, &info, sizeof(info)) != sizeof(info)) continue;
+            if (info.psi.soi_kind != SOCKINFO_TCP || info.psi.soi_proto.pri_tcp.tcpsi_state != TSI_S_LISTEN) continue;
+            if (ntohs((uint16_t)info.psi.soi_proto.pri_tcp.tcpsi_ini.insi_lport) == port) { found = pids[i]; break; }
+        }
+    }
+    free(pids);
+    return found;
+}
+
+static uint64_t tree_footprint(int32_t pid, int depth, int *budget) {
+    if (pid <= 0 || *budget <= 0) return 0;
+    (*budget)--;
+    uint64_t total = as_process_footprint(pid);
+    if (depth >= 4) return total;
+    pid_t children[64];
+    int bytes = proc_listpids(PROC_PPID_ONLY, (uint32_t)pid, children, sizeof(children));
+    for (int i = 0; bytes > 0 && i < bytes / (int)sizeof(pid_t) && i < 64; i++) total += tree_footprint(children[i], depth + 1, budget);
+    return total;
+}
+
+uint64_t as_tree_footprint(int32_t pid) {
+    int budget = 64;
+    return tree_footprint(pid, 0, &budget);
 }
