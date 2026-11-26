@@ -13,7 +13,7 @@ extension EnvironmentValues {
 }
 
 enum NeonEffect: Equatable {
-    case wave, ribbon, projection, shimmer
+    case wave, ribbon, projection
     case trace([Double])
     case track([NeonPoint])
     case routes([NeonRoute])
@@ -44,7 +44,7 @@ private struct FlowSurface: NSViewRepresentable {
 }
 
 private final class NeonLayerView: NSView {
-    private var effect: NeonEffect = .shimmer
+    private var effect: NeonEffect?
     private var color = NSColor.cyan
     private var drawnSize = CGSize.zero
     override var isFlipped: Bool { true }
@@ -58,7 +58,7 @@ private final class NeonLayerView: NSView {
     }
     override func layout() {
         super.layout()
-        guard bounds.size != drawnSize, !bounds.isEmpty else { return }
+        guard let effect, bounds.size != drawnSize, !bounds.isEmpty else { return }
         drawnSize = bounds.size
         CATransaction.begin(); CATransaction.setDisableActions(true)
         layer?.sublayers?.forEach { $0.removeFromSuperlayer() }
@@ -127,14 +127,6 @@ private final class NeonLayerView: NSView {
                 if index==0 {path.move(to:p)} else {path.addLine(to:p)}
             }
             particle(path:path,duration:7,offset:0)
-        case .shimmer:
-            let light=CAGradientLayer();light.colors=[NSColor.clear.cgColor,color.withAlphaComponent(0.28).cgColor,NSColor.clear.cgColor]
-            light.startPoint=CGPoint(x:0,y:0);light.endPoint=CGPoint(x:1,y:1)
-            light.frame=CGRect(x:-bounds.width,y:0,width:bounds.width,height:bounds.height)
-            let travel=CABasicAnimation(keyPath:"transform.translation.x");travel.fromValue=0;travel.toValue=bounds.width*2
-            travel.duration=6;travel.repeatCount = .infinity
-            travel.preferredFrameRateRange = CAFrameRateRange(minimum: 6, maximum: 10, preferred: 10)
-            layer?.addSublayer(light);light.add(travel,forKey:"light")
         }
         CATransaction.commit()
     }
@@ -188,13 +180,20 @@ private final class NeonLayerView: NSView {
         // forces repeated offscreen compositor passes, even with low app CPU.
         layer?.addSublayer(shape);return shape
     }
+    /// A comet: a bright head and a fading tail of the same light following the path a moment behind.
     private func particle(path:CGPath,duration:Double,offset:Double) {
-        let dot=CALayer();dot.bounds=CGRect(x:0,y:0,width:3,height:3);dot.cornerRadius=1.5;dot.backgroundColor=NSColor.white.cgColor
-        dot.shadowColor=color.cgColor;dot.shadowOpacity=1;dot.shadowRadius=5;dot.shadowOffset = .zero
-        dot.shadowPath = CGPath(ellipseIn: dot.bounds, transform: nil)
-        dot.shouldRasterize = true; dot.rasterizationScale = window?.backingScaleFactor ?? 2
-        let travel=CAKeyframeAnimation(keyPath:"position");travel.path=path;travel.calculationMode = .paced;travel.duration=duration;travel.repeatCount = .infinity;travel.timeOffset=offset
-        travel.preferredFrameRateRange = CAFrameRateRange(minimum: 6, maximum: 10, preferred: 10)
-        layer?.addSublayer(dot);dot.add(travel,forKey:"flow")
+        let epoch = layer?.convertTime(CACurrentMediaTime(), from:nil) ?? 0
+        for tail in 0..<6 {
+            let fade=1-Double(tail)/6, size=tail==0 ? 3.2:2.6*fade+0.6
+            let dot=CALayer();dot.bounds=CGRect(x:0,y:0,width:size,height:size);dot.cornerRadius=size/2
+            dot.backgroundColor=(tail==0 ? NSColor.white:color).cgColor;dot.opacity=Float(fade*fade)
+            dot.shadowColor=color.cgColor;dot.shadowOpacity=1;dot.shadowRadius=tail==0 ? 5:2.5;dot.shadowOffset = .zero
+            dot.shadowPath = CGPath(ellipseIn: dot.bounds, transform: nil)
+            dot.shouldRasterize = true; dot.rasterizationScale = window?.backingScaleFactor ?? 2
+            let travel=CAKeyframeAnimation(keyPath:"position");travel.path=path;travel.calculationMode = .paced;travel.duration=duration;travel.repeatCount = .infinity
+            travel.beginTime=epoch;travel.timeOffset=offset+duration-Double(tail)*0.07
+            travel.preferredFrameRateRange = CAFrameRateRange(minimum: 15, maximum: 30, preferred: 30)
+            layer?.addSublayer(dot);dot.add(travel,forKey:"flow")
+        }
     }
 }

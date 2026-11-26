@@ -56,7 +56,6 @@ struct HUDGrid: View {
             }
         }
         .background(RadialGradient(colors: [HUD.cyan.opacity(0.08), .clear], center: .center, startRadius: 50, endRadius: 700))
-        .overlay {NeonFlow(effect:.shimmer).opacity(0.12)}
         .allowsHitTesting(false).accessibilityHidden(true)
     }
 }

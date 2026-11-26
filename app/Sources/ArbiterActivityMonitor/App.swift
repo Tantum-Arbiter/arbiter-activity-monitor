@@ -33,6 +33,8 @@ enum Launcher {
             let width=dimension("--width",default:arguments.contains("--compact") ? 900.0:1586.0)
             let height=dimension("--height",default:arguments.contains("--compact") ? 2800.0:992.0)
             if let i=arguments.firstIndex(of:"--hover"),arguments.indices.contains(i+1) {store.previewHover=arguments[i+1]}
+            // --particles <seconds> freezes the Cinematic particle fields at that moment so they appear in the snapshot.
+            if let i=arguments.firstIndex(of:"--particles"),arguments.indices.contains(i+1),let time=Double(arguments[i+1]) {store.motionIntensity = .cinematic;store.previewParticles=time}
             // --destination renders another page (for example Models or Processes) instead of the overview.
             if let i=arguments.firstIndex(of:"--destination"),arguments.indices.contains(i+1),let page=Destination.allCases.first(where:{$0.rawValue.lowercased()==arguments[i+1].lowercased()}) {
                 store.destination=page
@@ -106,6 +108,20 @@ enum Launcher {
             }
             return
         }
+        // --preview <minimal|balanced|cinematic> [--seconds N]: open the live dashboard in that visual mode without
+        // writing history, events or preferences, then quit. Used to look at and measure decorative motion.
+        if let i=arguments.firstIndex(of:"--preview"),arguments.indices.contains(i+1),let intensity=MotionIntensity.allCases.first(where:{$0.rawValue.lowercased()==arguments[i+1].lowercased()}) {
+            MonitorStore.launchPreview=intensity
+            if let i=arguments.firstIndex(of:"--fps"),arguments.indices.contains(i+1),let fps=Float(arguments[i+1]) {ParticleFields.frameRate=min(60,max(5,fps))}
+            let seconds=arguments.firstIndex(of:"--seconds").flatMap {arguments.indices.contains($0+1) ? Double(arguments[$0+1]):nil} ?? 60
+            Task { @MainActor in
+                try? await Task.sleep(for:.seconds(min(600,max(5,seconds))))
+                // Report whether the window was really being drawn, so a measurement of a hidden window is not mistaken for a cheap one.
+                let window=NSApplication.shared.windows.first {$0.isVisible && $0.frame.width>300}
+                print("Preview \(intensity.rawValue): window \(window.map {"\(Int($0.frame.width))x\(Int($0.frame.height))"} ?? "none") · on screen \(window?.occlusionState.contains(.visible) == true) · low power \(ProcessInfo.processInfo.isLowPowerModeEnabled) · thermal \(ProcessInfo.processInfo.thermalState.rawValue)")
+                NSApplication.shared.terminate(nil)
+            }
+        }
         NSApplication.shared.setActivationPolicy(.regular)
         ArbiterActivityMonitorApp.main()
     }
@@ -137,7 +153,7 @@ enum Launcher {
 }
 
 struct ArbiterActivityMonitorApp: App {
-    @State private var store = MonitorStore()
+    @State private var store = MonitorStore(ephemeral: MonitorStore.launchPreview != nil)
     var body: some Scene {
         Window("ARBITER Activity Monitor", id: "dashboard") {
             DashboardView(store: store)

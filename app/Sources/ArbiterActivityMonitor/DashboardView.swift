@@ -43,6 +43,8 @@ struct DashboardView: View {
         }
         .ignoresSafeArea(.container,edges:.top)
         .background { HUDGrid().overlay(healthColor.opacity(contrast == .increased ? 0:0.025)).background(HUD.background) }.foregroundStyle(HUD.text).preferredColorScheme(.dark)
+        .overlay { ParticleField(kind: .motes).padding(.top, 55) }
+        .environment(\.hudParticleStill, snapshotMode ? store.previewParticles : nil)
         .environment(\.hudIntensity, store.motionIntensity)
         .environment(\.hudSnapshot, snapshotMode)
         .environment(\.hudValueMotion, !snapshotMode && store.motionIntensity != .minimal && store.active && !store.paused && !systemReduceMotion && !store.reducedMotion && !ProcessInfo.processInfo.isLowPowerModeEnabled && ProcessInfo.processInfo.thermalState.rawValue < 2)
@@ -50,7 +52,7 @@ struct DashboardView: View {
         .environment(\.hudAmbientMotion, !snapshotMode && store.motionIntensity == .cinematic && store.ambientMotion && store.active && !store.paused && !systemReduceMotion && !store.reducedMotion && !ProcessInfo.processInfo.isLowPowerModeEnabled && ProcessInfo.processInfo.thermalState.rawValue < 2)
         .tint(HUD.cyan).frame(minWidth: 440, minHeight: 560)
         .task { if !snapshotMode { store.start() } }
-        .onChange(of: scenePhase) { _, phase in store.active = phase == .active }
+        .onChange(of: scenePhase) { _, phase in store.active = phase == .active || store.ephemeral }
         .sheet(isPresented: Binding(get: { store.selectedProcessID != nil }, set: { if !$0 { store.selectedProcessID = nil } })) { ProcessInspector(store: store) }
         .sheet(isPresented: Binding(get: { store.inspectedSessionID != nil }, set: { if !$0 { store.inspectedSessionID = nil } })) { SessionInspector(store: store) }
         .modifier(QuitConfirmation(store: store))

@@ -230,6 +230,8 @@ struct MonitorSettings: View {
                 }
                 Picker("History retention", selection: $store.retentionDays) { Text("1 day").tag(1); Text("7 days").tag(7); Text("30 days").tag(30) }
                 Picker("Visual intensity",selection:$store.motionIntensity) {ForEach(MotionIntensity.allCases) {Text($0.rawValue).tag($0)}}
+                Text(store.motionIntensity == .cinematic ? "Cinematic adds particle fields: drifting motes with depth, light packets on the grid, sparks rising through the hologram, comets orbiting the globe and circling panel edges. Decoration only; it costs extra compositor work and stops when the window is in the background, paused, in Low Power Mode or under thermal pressure." : store.motionIntensity == .balanced ? "Balanced keeps the rotating mesh, the sidebar ribbon and brief highlights when new measurements arrive." : "Minimal removes atmosphere and measurement transitions.")
+                    .font(.system(size: 11)).foregroundStyle(HUD.muted)
                 Toggle("Reduce motion", isOn: $store.reducedMotion)
                 Toggle("Ambient holographic orbits", isOn: $store.ambientMotion)
                 Slider(value: $store.cpuThreshold, in: 80...100, step: 1) { Text("Sustained CPU warning: \(Int(store.cpuThreshold))% for 30 seconds") }

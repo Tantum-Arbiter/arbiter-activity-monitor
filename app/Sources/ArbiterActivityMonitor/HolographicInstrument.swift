@@ -32,6 +32,7 @@ struct HolographicInstrument: View {
                 AnimatedMeter(value:sample?.memoryPercent,color:HUD.purple,geometry:.arc(start:-0.22,sweep:0.43,width:3))
                     .frame(width:diameter*0.87,height:diameter*0.87).position(center)
                 LaptopGlyph().frame(width: diameter * 0.34, height: diameter * 0.24).position(x: center.x, y: center.y + diameter * 0.08)
+                ParticleField(kind: .hologram)
                 HStack {
                     Button { navigate(.cpu) } label: {
                         VStack(alignment: .leading, spacing: 2) {

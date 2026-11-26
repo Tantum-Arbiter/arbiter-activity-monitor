@@ -52,7 +52,18 @@ struct ProcessObservation: Identifiable {
 @MainActor @Observable
 final class MonitorStore {
     @ObservationIgnored private var persistPreferences: Bool
-    init(persistPreferences: Bool = true) { self.persistPreferences = persistPreferences }
+    /// Preview runs (`--preview`) read live measurements but write no history, events or preferences.
+    @ObservationIgnored let ephemeral: Bool
+    /// Set by the launcher before the app scene is created.
+    static var launchPreview: MotionIntensity?
+    init(persistPreferences: Bool = true, ephemeral: Bool = false) {
+        self.persistPreferences = persistPreferences && !ephemeral
+        self.ephemeral = ephemeral
+        historyStore = HistoryStore(url: ephemeral ? FileManager.default.temporaryDirectory.appendingPathComponent("arbiter-preview-\(ProcessInfo.processInfo.processIdentifier).sqlite") : nil)
+        if ephemeral, let intensity = Self.launchPreview { motionIntensity = intensity; ambientMotion = true; reducedMotion = false; destination = .overview }
+    }
+    /// Snapshot rendering only: seconds into the particle cycles to freeze Cinematic particles at.
+    @ObservationIgnored var previewParticles: Double?
     var latest: SystemSample? { didSet { workloads = WorkloadAttribution.group(latest?.processes ?? [], tracked: tracked) } }
     var history: [SystemSample] = []
     var events: [MonitorEvent] = []
@@ -93,7 +104,7 @@ final class MonitorStore {
     /// Snapshot rendering only: which harness node to draw the hover card for.
     @ObservationIgnored var previewHover: String?
     @ObservationIgnored private var lastSessionRead = Date.distantPast
-    private let historyStore = HistoryStore()
+    private let historyStore: HistoryStore
     private var task: Task<Void, Never>?
     private var lastHistoryRead = Date.distantPast
     @ObservationIgnored private var pendingHistory: [SystemSample] = []

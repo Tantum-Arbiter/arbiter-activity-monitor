@@ -27,6 +27,7 @@ struct ReferencePanel<Content: View>: View {
                 .shadow(color:.black.opacity(0.3),radius:7,y:4)
         }
         .overlay(NeonPanelEdge(emphasized:hovered || contrast == .increased))
+        .overlay(ParticleField(kind:.edge(seed:title.unicodeScalars.reduce(7) { ($0 &* 31 &+ Int($1.value)) % 100_003 },corner:15)))
         .onHover { hovered=$0 }.animation(reducedMotion ? nil : .easeOut(duration:0.15),value:hovered)
     }
 }
@@ -56,7 +57,7 @@ struct LuminousSparkline: View {
             context.fill(fill,with:.linearGradient(Gradient(colors:[color.opacity(0.32),color.opacity(0.01)]),startPoint:.zero,endPoint:CGPoint(x:0,y:size.height)))
             context.stroke(line,with:.color(color.opacity(0.12)),lineWidth:5)
             context.stroke(line,with:.color(color),lineWidth:1.1)
-        }.overlay(alignment:.trailing) {SamplePulse(token:values.last ?? 0,color:color).frame(width:5)}.overlay { if !bars {NeonFlow(effect:.trace(values),color:color)} else {NeonFlow(effect:.shimmer,color:color)} }.accessibilityHidden(true)
+        }.overlay(alignment:.trailing) {SamplePulse(token:values.last ?? 0,color:color).frame(width:5)}.overlay { if !bars {NeonFlow(effect:.trace(values),color:color)} else {ParticleField(kind:.stream(seed:values.count,fraction:1),color:color)} }.accessibilityHidden(true)
     }
 }
 
@@ -80,7 +81,7 @@ struct ReferenceMetric: View {
                 if let progress {
                     Capsule().fill(color.opacity(0.08))
                         .overlay { AnimatedMeter(value:progress,color:color,geometry:.bar) }
-                        .frame(height:6).overlay{NeonFlow(effect:.shimmer,color:color)}
+                        .frame(height:6).overlay{ParticleField(kind:.stream(seed:title.count,fraction:progress/100),color:color)}
                 }
                 Text(detail).font(.system(size:9)).foregroundStyle(Color(hex:0xa7bdca)).lineLimit(2)
             }.frame(maxWidth:.infinity,alignment:.leading)
