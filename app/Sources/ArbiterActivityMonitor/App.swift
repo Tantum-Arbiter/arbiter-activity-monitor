@@ -28,7 +28,7 @@ enum Launcher {
             store.sessionSources = merged.sources
             func dimension(_ flag:String,default fallback:Double)->Double {
                 guard let i=arguments.firstIndex(of:flag),arguments.indices.contains(i+1),let value=Double(arguments[i+1]),value.isFinite else{return fallback}
-                return min(4000,max(600,value))
+                return min(4000,max(380,value))
             }
             let width=dimension("--width",default:arguments.contains("--compact") ? 900.0:1586.0)
             let height=dimension("--height",default:arguments.contains("--compact") ? 2800.0:992.0)
@@ -172,6 +172,8 @@ struct MenuSummary: View {
         Divider()
         Button("Open dashboard") { openWindow(id: "dashboard"); NSApplication.shared.activate(ignoringOtherApps: true) }
         Button(store.paused ? "Resume sampling" : "Pause sampling") { store.paused.toggle() }
+        if case .available(let release) = store.updateState { Button("Install version \(release.version.description) and relaunch") { Task { await store.installUpdate() } } }
+        if store.pendingRelaunch != nil { Button("Relaunch to finish updating") { store.relaunch() } }
         Divider()
         Button("Quit ARBITER Activity Monitor") { NSApplication.shared.terminate(nil) }.keyboardShortcut("q")
     }

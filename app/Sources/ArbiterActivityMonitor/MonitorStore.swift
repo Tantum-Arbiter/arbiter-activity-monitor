@@ -40,7 +40,7 @@ enum Destination: String, CaseIterable, Identifiable {
 
 enum UpdateState: Equatable {
     case idle, checking, upToDate
-    case available(ReleaseInfo), installing(ReleaseInfo)
+    case available(ReleaseInfo), installing(ReleaseInfo), installed(ReleaseInfo)
     case failed(String)
 }
 
@@ -109,10 +109,29 @@ final class MonitorStore {
     var updateBlocker: String? { AppVersion(appVersion) == nil ? "This build has no version number" : Updater.blocker(for: Bundle.main.bundleURL) }
     @ObservationIgnored private lazy var updater = Updater(currentVersion: appVersion)
     @ObservationIgnored private var updateTask: Task<Void, Never>?
+    /// Automatic checks run at most this often (and soon after launch when the last check is older).
+    static let updateCheckInterval: TimeInterval = 6 * 3600
+    /// One-time question whether to turn automatic updates on; never shown once answered or if already on.
+    var askAboutUpdates = false
+    /// A verified update already swapped in on disk, waiting for the operator to switch away before relaunching.
+    var pendingRelaunch: AppVersion?
+
+    func chooseAutomaticUpdates(check: Bool, install: Bool) {
+        askAboutUpdates = false
+        if persistPreferences { UserDefaults.standard.set(true, forKey: "updatePreferenceAsked") }
+        autoCheckUpdates = check
+        autoInstallUpdates = check && install
+        guard check else { return }
+        Task {
+            await checkForUpdate()
+            if install, case .available = updateState { await installUpdate(relaunchNow: false) }
+        }
+    }
 
     func checkForUpdate() async {
         guard let current = AppVersion(appVersion), updateState != .checking else { return }
         if case .installing = updateState { return }
+        if case .installed = updateState { return }
         updateState = .checking
         do {
             let release = try await updater.latest()
@@ -123,7 +142,7 @@ final class MonitorStore {
     }
 
     /// Downloads, verifies and swaps in the new build, then relaunches into it.
-    func installUpdate() async {
+    func installUpdate(relaunchNow: Bool = true) async {
         guard case .available(let release) = updateState else { return }
         if let updateBlocker { updateState = .failed(updateBlocker); return }
         updateState = .installing(release)
@@ -131,13 +150,24 @@ final class MonitorStore {
         do {
             let staged = try await updater.stage(release, for: bundle, identifier: Bundle.main.bundleIdentifier ?? "")
             try await updater.install(staged, over: bundle)
-            record("Updated to version \(release.version)", warning: false)
-            let relaunch = Process()
-            relaunch.executableURL = URL(fileURLWithPath: "/bin/sh")
-            relaunch.arguments = ["-c", "sleep 1; exec /usr/bin/open -n \"$0\"", bundle.path]
-            try relaunch.run()
-            NSApplication.shared.terminate(nil)
+            record("Updated to version \(release.version)\(relaunchNow ? "" : " automatically")", warning: false)
+            if relaunchNow { relaunch() }
+            else {
+                // Installed on disk; the running copy keeps working until the operator switches away.
+                updateState = .installed(release)
+                pendingRelaunch = release.version
+                show("Version \(release.version) installed · relaunches when you switch to another app")
+            }
         } catch { updateState = .failed((error as? UpdateError)?.errorDescription ?? error.localizedDescription) }
+    }
+
+    /// Reopens the (already replaced) bundle and quits this copy.
+    func relaunch() {
+        let relaunch = Process()
+        relaunch.executableURL = URL(fileURLWithPath: "/bin/sh")
+        relaunch.arguments = ["-c", "sleep 1; exec /usr/bin/open -n \"$0\"", Bundle.main.bundleURL.path]
+        guard (try? relaunch.run()) != nil else { return }
+        NSApplication.shared.terminate(nil)
     }
 
     private(set) var workloads: [Workload] = []
@@ -206,13 +236,26 @@ final class MonitorStore {
 
     func start() {
         guard task == nil else { return }
+        if persistPreferences && !UserDefaults.standard.bool(forKey: "updatePreferenceAsked") && !autoCheckUpdates && updateBlocker == nil {
+            askAboutUpdates = true
+        }
         updateTask = Task { [weak self] in
+            // Let the window and first samples settle before any network use.
+            do { try await Task.sleep(for: .seconds(20)) } catch { return }
             while !Task.isCancelled {
-                if let self, self.autoCheckUpdates, self.updateBlocker == nil, Date().timeIntervalSince(self.lastUpdateCheck ?? .distantPast) >= 86400 {
-                    await self.checkForUpdate()
-                    if self.autoInstallUpdates, case .available = self.updateState { await self.installUpdate() }
+                var pause = 600.0
+                if let self {
+                    if self.pendingRelaunch != nil {
+                        // Relaunch into the installed update only while the operator is using another app.
+                        if !NSApplication.shared.isActive && self.quitRequest == nil && self.benchmarkTask == nil { self.relaunch() }
+                        pause = 15
+                    } else if self.autoCheckUpdates, self.updateBlocker == nil,
+                              Date().timeIntervalSince(self.lastUpdateCheck ?? .distantPast) >= Self.updateCheckInterval {
+                        await self.checkForUpdate()
+                        if self.autoInstallUpdates, case .available = self.updateState { await self.installUpdate(relaunchNow: false) }
+                    }
                 }
-                do { try await Task.sleep(for: .seconds(3600)) } catch { return }
+                do { try await Task.sleep(for: .seconds(pause)) } catch { return }
             }
         }
         task = Task { [weak self] in

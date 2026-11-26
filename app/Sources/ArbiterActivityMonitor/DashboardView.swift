@@ -11,8 +11,9 @@ struct DashboardView: View {
     var body: some View {
         GeometryReader { geometry in
             let narrow = geometry.size.width < 980
+            let layout = LayoutWidth.forContent(geometry.size.width - (narrow ? 69 : 151) - 24)
             VStack(spacing: 0) {
-                header(compact: geometry.size.width < 1440)
+                header(width: geometry.size.width)
                 Divider().overlay(HUD.cyan.opacity(0.15))
                 HStack(spacing: 0) {
                     sidebar(compact: narrow)
@@ -26,11 +27,18 @@ struct DashboardView: View {
                             }
                         }
                     } else if snapshotMode {
-                        page(width:geometry.size.width-(narrow ? 69:151)-40).frame(maxHeight:.infinity,alignment:.top)
+                        page(width:geometry.size.width-(narrow ? 69:151)-40).fixedSize(horizontal:false,vertical:true).frame(maxHeight:.infinity,alignment:.top)
                     } else {
                         ScrollView { page(width:geometry.size.width-(narrow ? 69:151)-40) }
                     }
                 }
+            }.environment(\.hudLayout, layout)
+            .alert("Keep ARBITER Activity Monitor up to date?", isPresented: Binding(get: { store.askAboutUpdates && !snapshotMode }, set: { if !$0 { store.askAboutUpdates = false } })) {
+                Button("Update automatically") { store.chooseAutomaticUpdates(check: true, install: true) }
+                Button("Only tell me about updates") { store.chooseAutomaticUpdates(check: true, install: false) }
+                Button("Not now", role: .cancel) { store.chooseAutomaticUpdates(check: false, install: false) }
+            } message: {
+                Text("The app can check its public GitHub release list at launch and every 6 hours. New versions are verified (checksum, identity, version and signature) and installed in place, then the app reopens the next time you switch to another app. Nothing about this Mac is sent. You can change this any time in Settings → Updates.")
             }
         }
         .ignoresSafeArea(.container,edges:.top)
@@ -40,7 +48,7 @@ struct DashboardView: View {
         .environment(\.hudValueMotion, !snapshotMode && store.motionIntensity != .minimal && store.active && !store.paused && !systemReduceMotion && !store.reducedMotion && !ProcessInfo.processInfo.isLowPowerModeEnabled && ProcessInfo.processInfo.thermalState.rawValue < 2)
         .environment(\.hudReducedMotion, systemReduceMotion || store.reducedMotion)
         .environment(\.hudAmbientMotion, !snapshotMode && store.motionIntensity == .cinematic && store.ambientMotion && store.active && !store.paused && !systemReduceMotion && !store.reducedMotion && !ProcessInfo.processInfo.isLowPowerModeEnabled && ProcessInfo.processInfo.thermalState.rawValue < 2)
-        .tint(HUD.cyan).frame(minWidth: 760, minHeight: 600)
+        .tint(HUD.cyan).frame(minWidth: 440, minHeight: 560)
         .task { if !snapshotMode { store.start() } }
         .onChange(of: scenePhase) { _, phase in store.active = phase == .active }
         .sheet(isPresented: Binding(get: { store.selectedProcessID != nil }, set: { if !$0 { store.selectedProcessID = nil } })) { ProcessInspector(store: store) }
@@ -71,22 +79,23 @@ struct DashboardView: View {
         switch store.health { case .healthy: HUD.green; case .pressure: HUD.amber; case .critical: HUD.red; case .unknown: HUD.muted }
     }
 
-    private func header(compact: Bool) -> some View {
-        HStack(spacing:12) {
-            Image(systemName:"waveform.path").font(.system(size:27,weight:.medium)).foregroundStyle(HUD.cyan).shadow(color:HUD.cyan.opacity(0.4),radius:5)
-            Text("ARBITER Activity Monitor").font(.system(size:21,weight:.semibold)).fixedSize()
+    private func header(width: CGFloat) -> some View {
+        let compact = width < 1440, slim = width < 760
+        return HStack(spacing:slim ? 8:12) {
+            Image(systemName:"waveform.path").font(.system(size:slim ? 22:27,weight:.medium)).foregroundStyle(HUD.cyan).shadow(color:HUD.cyan.opacity(0.4),radius:5)
+            Text(slim ? "ARBITER" : "ARBITER Activity Monitor").font(.system(size:slim ? 18:21,weight:.semibold)).fixedSize()
             if !compact { Rectangle().fill(HUD.muted.opacity(0.4)).frame(width:1,height:27);Text("System + Local AI Operations").font(.system(size:12)).foregroundStyle(Color(hex:0xb6cadd)) }
             Spacer(minLength:2)
             StatusPill(text:store.paused ? "Paused":(compact ? "":"System State: ")+store.health.rawValue,color:healthColor)
-            HStack(spacing:3) {
+            if width >= 620 { HStack(spacing:3) {
                 headerMetric(.cpu,percent(store.latest?.cpu),color:HUD.cyan)
                 if !compact {headerMetric(.gpu,percent(store.latest?.gpu),color:HUD.purple)}
                 headerMetric(.memory,store.latest.map{compact ? bytes($0.memoryUsed):"\(String(format:"%.1f",Double($0.memoryUsed)/1_073_741_824)) / \(bytes($0.memoryTotal))"} ?? "—",color:HUD.purple)
                 if !compact {headerMetric(.battery,percent(store.latest?.battery),color:HUD.cyan);headerMetric(.thermals,store.latest?.thermal ?? "—",color:HUD.cyan)}
                 if !compact {headerMetric(.workloads,"\(OverviewWorkload.groups(store.workloads).count) apps",color:HUD.purple)}
-            }
+            } }
             Button {store.paused.toggle()} label:{Image(systemName:store.paused ? "play.fill":"pause.fill").font(.system(size:10)).foregroundStyle(HUD.muted)}.buttonStyle(.plain).help(store.paused ? "Resume monitoring":"Pause monitoring")
-        }.padding(.leading,compact ? 84:112).padding(.trailing,12).frame(height:54)
+        }.padding(.leading,slim ? 78:compact ? 84:112).padding(.trailing,12).frame(height:54)
         .background(LinearGradient(colors:[Color(hex:0x08121d),Color(hex:0x030a11)],startPoint:.top,endPoint:.bottom))
         .overlay(alignment:.leading) {
             if snapshotMode {

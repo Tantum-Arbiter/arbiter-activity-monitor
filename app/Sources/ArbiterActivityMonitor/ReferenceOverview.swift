@@ -45,17 +45,48 @@ struct ReferenceOverview: View {
                 }.frame(height:320)
                 HStack(spacing:12){ReferenceHeatmap(history:store.chartHistory);SessionThroughput(sessions:store.sessions)}.frame(height:180)
             } else {
-                HStack(spacing:12) {
-                    ReferenceResourceMatrix(sample:store.latest,history:store.chartHistory,navigate:{store.destination=$0},spotlight:{store.spotlight=$0?.rawValue})
-                    if width>820 {instrument.frame(width:width*0.42)}
-                }.frame(height:386)
-                if width<=820 {instrument.frame(height:386)}
-                SessionAgentsPanel(store:store).frame(height:387)
-                HistoryPanel(history:store.chartHistory,spotlight:store.spotlight)
-                HStack(spacing:12){ReferenceHeatmap(history:store.chartHistory);SessionThroughput(sessions:store.sessions)}.frame(height:180)
-                ReferenceProcesses(sample:store.latest,inspect:store.inspect,quit:store.requestQuit).frame(height:320)
-                AgentOrchestration(store:store).frame(height:344)
-                ReferenceEvents(alerts:store.alerts,events:store.events,replay:store.replay,open:{store.destination = .alerts}).frame(height:312)
+                stacked(slim:width<560)
+            }
+        }
+    }
+    /// Below 940 points: panels stack in priority order and take their natural height instead of filling fixed slots.
+    private func stacked(slim:Bool)->some View {
+        VStack(spacing:12) {
+            pulse(slim:slim)
+            ReferenceResourceMatrix(sample:store.latest,history:store.chartHistory,navigate:{store.destination=$0},spotlight:{store.spotlight=$0?.rawValue},columns:slim ? 1:2)
+            SessionAgentsPanel(store:store,fit:true)
+            ReferenceProcesses(sample:store.latest,inspect:store.inspect,quit:store.requestQuit,slim:slim)
+            HistoryPanel(history:store.chartHistory,height:slim ? 210:230,spotlight:store.spotlight)
+            if slim {
+                ReferenceHeatmap(history:store.chartHistory).frame(height:190)
+                SessionThroughput(sessions:store.sessions).frame(height:150)
+            } else {
+                HStack(spacing:12){ReferenceHeatmap(history:store.chartHistory);SessionThroughput(sessions:store.sessions).frame(width:min(260,width*0.36))}.frame(height:180)
+            }
+            AgentOrchestration(store:store,list:slim).frame(height:slim ? nil:344)
+            ReferenceEvents(alerts:store.alerts,events:store.events,replay:store.replay,open:{store.destination = .alerts},fit:true)
+        }.fixedSize(horizontal:false,vertical:true)
+    }
+    /// Stacked replacement for the central instrument: the same measured load and memory, without the large decorative globe.
+    private func pulse(slim:Bool)->some View {
+        let s=store.latest
+        let hasEvents=store.sessions.contains{!$0.events.isEmpty}
+        return ReferencePanel(title:"Live Status",subtitle:"\(store.paused ? "Paused":store.health.rawValue) · \(s.map{"sampled "+$0.id.formatted(date:.omitted,time:.standard)} ?? "waiting for first sample")") {
+            let rings=[
+                (Destination.cpu,"System load",s?.cpu,"\(ProcessInfo.processInfo.processorCount) cores · user \(percent(s?.userCPU)) · system \(percent(s?.systemCPU))",HUD.cyan),
+                (Destination.memory,"Unified memory",s?.memoryPercent,s.map{"\(bytes($0.memoryUsed)) of \(bytes($0.memoryTotal)) · pressure \($0.pressure.lowercased())"} ?? "Collecting…",s?.pressure == "Normal" ? HUD.purple:s?.pressure == "Critical" ? HUD.red:HUD.amber),
+                (Destination.gpu,"GPU",s?.gpu,s?.gpu == nil ? "Driver reading unavailable":"Device utilization · renderer \(percent(s?.gpuRenderer))",HUD.blue),
+            ]
+            LazyVGrid(columns:Array(repeating:GridItem(.flexible(),spacing:8),count:slim ? 1:3),spacing:8) {
+                ForEach(rings,id:\.1){ring in
+                    Button {store.destination=ring.0} label:{PulseRing(title:ring.1,value:ring.2,detail:ring.3,color:ring.4)}.buttonStyle(HUDRowStyle()).help("Open \(ring.0.rawValue)")
+                }
+            }
+            LazyVGrid(columns:Array(repeating:GridItem(.flexible(),spacing:6),count:slim ? 2:4),spacing:6) {
+                heroStat("Sessions",value:String(store.sessions.count),symbol:"scope",color:HUD.cyan).frame(height:44)
+                heroStat("Running",value:hasEvents ? String(store.sessions.filter{$0.isRunning}.count):"—",symbol:"square.3.layers.3d",color:HUD.purple).frame(height:44)
+                heroStat("Tool events",value:hasEvents ? String(store.sessions.flatMap(\.events).filter{$0.event=="PostToolUse"}.count):"—",symbol:"bolt.fill",color:HUD.amber).frame(height:44)
+                heroStat("Turns seen",value:hasEvents ? String(store.sessions.flatMap(\.events).filter{$0.event=="Stop"}.count):"—",symbol:"square.grid.2x2",color:HUD.purple).frame(height:44)
             }
         }
     }

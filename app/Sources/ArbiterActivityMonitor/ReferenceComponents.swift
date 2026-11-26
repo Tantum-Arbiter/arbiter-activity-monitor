@@ -107,26 +107,28 @@ struct ReferenceResourceMatrix: View {
     let history: [SystemSample]
     let navigate: (Destination)->Void
     var spotlight: (Destination?)->Void = {_ in}
+    var columns = 2
     var body: some View {
         ReferencePanel(title:"System Performance",subtitle:"MacBook System · Real-time") {
-            Grid(horizontalSpacing:6,verticalSpacing:6) {
-                GridRow {
-                    metric(.cpu) { ReferenceMetric(title:"CPU",value:percent(sample?.cpu),detail:"\(ProcessInfo.processInfo.processorCount) logical cores",symbol:"cpu",color:HUD.cyan,gauge:sample?.cpu,gaugeStyle:true,values:history.suffix(25).compactMap(\.cpu)) }
-                    metric(.gpu) { ReferenceMetric(title:"GPU",value:percent(sample?.gpu),detail:sample?.gpu == nil ? "Driver unavailable":"Integrated · Driver",symbol:"display",color:HUD.purple,gauge:sample?.gpu,gaugeStyle:true,values:history.suffix(25).compactMap(\.gpu)) }
-                }
-                GridRow {
-                    metric(.memory) { ReferenceMetric(title:"Memory (Unified)",value:sample.map {"\(bytes($0.memoryUsed)) / \(bytes($0.memoryTotal))"} ?? "—",detail:"Pressure: \(sample?.pressure ?? "Unknown")",symbol:"square.3.layers.3d",color:sample?.pressure == "Normal" ? HUD.purple:sample?.pressure == "Critical" ? HUD.red:HUD.amber,progress:sample?.memoryPercent) }
-                    metric(.storage) { ReferenceMetric(title:"Storage",value:sample.map {bytes($0.diskFree)+" free"} ?? "—",detail:sample.map {"of \(bytes($0.diskTotal)) · Data volume"} ?? "Collecting…",symbol:"internaldrive",color:sample.map{$0.diskTotal>0 && Double($0.diskFree)/Double($0.diskTotal)<0.1} == true ? HUD.amber:HUD.cyan,progress:sample.flatMap {$0.diskTotal>0 ? 100*(1-Double($0.diskFree)/Double($0.diskTotal)) : nil}) }
-                }
-                GridRow {
-                    metric(.network) { ReferenceMetric(title:"Network",value:"↓ \(rate(sample?.download))",detail:"↑ \(rate(sample?.upload))",symbol:"wifi",color:HUD.cyan,values:history.suffix(25).compactMap(\.download)) }
-                    metric(.storage) { ReferenceMetric(title:"Disk I/O",value:"R: \(rate(sample?.diskRead))",detail:"W: \(rate(sample?.diskWrite))",symbol:"externaldrive",color:HUD.purple,values:history.suffix(25).compactMap(\.diskWrite),bars:true) }
-                }
-                GridRow {
-                    metric(.battery) { ReferenceMetric(title:"Battery",value:percent(sample?.battery),detail:sample?.onPower == true ? "External power" : "On battery",symbol:"battery.75percent",color:HUD.green,progress:sample?.battery) }
-                    metric(.thermals) { ReferenceMetric(title:"Thermals",value:sample?.thermal ?? "—",detail:"OS thermal pressure\nSensors unavailable",symbol:"thermometer.medium",color:sample?.thermal == "Critical" ? HUD.red : HUD.green,values:history.suffix(25).map {$0.thermal == "Nominal" ? 0.15 : $0.thermal == "Fair" ? 0.4 : 0.8}) }
-                }
-            }.buttonStyle(.plain)
+            if columns == 1 {
+                VStack(spacing:6) { ForEach(0..<8, id:\.self) { card($0) } }.buttonStyle(.plain)
+            } else {
+                Grid(horizontalSpacing:6,verticalSpacing:6) {
+                    ForEach(0..<4, id:\.self) { row in GridRow { card(row*2); card(row*2+1) } }
+                }.buttonStyle(.plain)
+            }
+        }
+    }
+    @ViewBuilder private func card(_ index:Int)->some View {
+        switch index {
+        case 0: metric(.cpu) { ReferenceMetric(title:"CPU",value:percent(sample?.cpu),detail:"\(ProcessInfo.processInfo.processorCount) logical cores",symbol:"cpu",color:HUD.cyan,gauge:sample?.cpu,gaugeStyle:true,values:history.suffix(25).compactMap(\.cpu)) }
+        case 1: metric(.gpu) { ReferenceMetric(title:"GPU",value:percent(sample?.gpu),detail:sample?.gpu == nil ? "Driver unavailable":"Integrated · Driver",symbol:"display",color:HUD.purple,gauge:sample?.gpu,gaugeStyle:true,values:history.suffix(25).compactMap(\.gpu)) }
+        case 2: metric(.memory) { ReferenceMetric(title:"Memory (Unified)",value:sample.map {"\(bytes($0.memoryUsed)) / \(bytes($0.memoryTotal))"} ?? "—",detail:"Pressure: \(sample?.pressure ?? "Unknown")",symbol:"square.3.layers.3d",color:sample?.pressure == "Normal" ? HUD.purple:sample?.pressure == "Critical" ? HUD.red:HUD.amber,progress:sample?.memoryPercent) }
+        case 3: metric(.storage) { ReferenceMetric(title:"Storage",value:sample.map {bytes($0.diskFree)+" free"} ?? "—",detail:sample.map {"of \(bytes($0.diskTotal)) · Data volume"} ?? "Collecting…",symbol:"internaldrive",color:sample.map{$0.diskTotal>0 && Double($0.diskFree)/Double($0.diskTotal)<0.1} == true ? HUD.amber:HUD.cyan,progress:sample.flatMap {$0.diskTotal>0 ? 100*(1-Double($0.diskFree)/Double($0.diskTotal)) : nil}) }
+        case 4: metric(.network) { ReferenceMetric(title:"Network",value:"↓ \(rate(sample?.download))",detail:"↑ \(rate(sample?.upload))",symbol:"wifi",color:HUD.cyan,values:history.suffix(25).compactMap(\.download)) }
+        case 5: metric(.storage) { ReferenceMetric(title:"Disk I/O",value:"R: \(rate(sample?.diskRead))",detail:"W: \(rate(sample?.diskWrite))",symbol:"externaldrive",color:HUD.purple,values:history.suffix(25).compactMap(\.diskWrite),bars:true) }
+        case 6: metric(.battery) { ReferenceMetric(title:"Battery",value:percent(sample?.battery),detail:sample?.onPower == true ? "External power" : "On battery",symbol:"battery.75percent",color:HUD.green,progress:sample?.battery) }
+        default: metric(.thermals) { ReferenceMetric(title:"Thermals",value:sample?.thermal ?? "—",detail:"OS thermal pressure\nSensors unavailable",symbol:"thermometer.medium",color:sample?.thermal == "Critical" ? HUD.red : HUD.green,values:history.suffix(25).map {$0.thermal == "Nominal" ? 0.15 : $0.thermal == "Fair" ? 0.4 : 0.8}) }
         }
     }
     private func metric<Content:View>(_ destination:Destination,@ViewBuilder content:()->Content)->some View {

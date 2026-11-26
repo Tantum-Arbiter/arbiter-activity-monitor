@@ -132,6 +132,7 @@ struct ReferenceProcesses: View {
     let sample:SystemSample?
     let inspect:(ProcessSample)->Void
     var quit:(([ProcessSample],QuitMode)->Void)?
+    var slim=false
     @State private var scope="All"
     @AppStorage("overviewProcessSort") private var sort=ConsumptionSort.cpu
     @State private var selection=Set<String>()
@@ -149,10 +150,10 @@ struct ReferenceProcesses: View {
             }.padding(3).background(.white.opacity(0.045),in:RoundedRectangle(cornerRadius:10)).overlay(RoundedRectangle(cornerRadius:10).strokeBorder(HUD.cyan.opacity(0.2),lineWidth:0.7))
             HStack{
                 if quit != nil {Color.clear.frame(width:14)}
-                Text("Name").frame(maxWidth:.infinity,alignment:.leading);Text("Type").frame(width:43)
+                Text("Name").frame(maxWidth:.infinity,alignment:.leading);if !slim {Text("Type").frame(width:43)}
                 SortHeader(title:"CPU",active:sort == .cpu){sort = .cpu}.frame(width:42)
                 SortHeader(title:"Memory",active:sort == .memory){sort = .memory}.frame(width:64)
-                Text("State").frame(width:52)
+                if !slim {Text("State").frame(width:52)}
             }.font(.system(size:9)).foregroundStyle(Color(hex:0xb6ccda))
             if let quit,!selected.isEmpty {QuitBar(count:selected.count,clear:{selection=[]}){mode in quit(selected,mode)}}
             VStack(spacing:0) {
@@ -163,10 +164,10 @@ struct ReferenceProcesses: View {
                         HStack(spacing:5){
                             Image(systemName:p.agent != nil ? "terminal":"square.stack.3d.up").foregroundStyle(p.agent != nil ? HUD.purple:HUD.muted).frame(width:18)
                             Text(p.name).lineLimit(1).frame(maxWidth:.infinity,alignment:.leading)
-                            Text(p.agent != nil ? "Agent":p.user ? "User":"System").font(.system(size:8)).padding(2).background(HUD.purple.opacity(0.12),in:RoundedRectangle(cornerRadius:3)).frame(width:43)
+                            if !slim {Text(p.agent != nil ? "Agent":p.user ? "User":"System").font(.system(size:8)).padding(2).background(HUD.purple.opacity(0.12),in:RoundedRectangle(cornerRadius:3)).frame(width:43)}
                             Text(percent(p.cpu)).frame(width:42)
                             Text(p.memory.map(bytes) ?? "—").frame(width:64)
-                            Text(p.state).font(.system(size:8)).foregroundStyle(HUD.green).frame(width:52)
+                            if !slim {Text(p.state).font(.system(size:8)).foregroundStyle(HUD.green).frame(width:52)}
                         }.font(.system(size:10)).monospacedDigit().padding(.vertical,6)
                     }.buttonStyle(HUDRowStyle()).modifier(HoverLight()).modifier(QuitMenu(processes:[p],quit:quit))
                     }
@@ -183,6 +184,8 @@ struct ReferenceEvents:View {
     let events:[MonitorEvent]
     var replay:(Date)->Void = {_ in}
     let open:()->Void
+    /// Stacked layouts: alerts take their natural height.
+    var fit=false
     var body:some View {
         VStack(spacing:12) {
             ReferencePanel(title:"Alerts",subtitle:"\(alerts.count) active performance conditions") {
@@ -190,7 +193,7 @@ struct ReferenceEvents:View {
                 ForEach(Array(alerts.prefix(3)),id:\.self){message in
                     HStack(spacing:8){Image(systemName:"exclamationmark.triangle.fill").foregroundStyle(message.contains("critical") ? HUD.red:HUD.amber);Text(message).font(.system(size:10)).lineLimit(1);Spacer(minLength:0)}.padding(6).background(.white.opacity(0.035),in:RoundedRectangle(cornerRadius:8))
                 }
-            }.frame(height:132).animation(animate ? .easeOut(duration:0.25):nil,value:alerts)
+            }.frame(height:fit ? nil:132).animation(animate ? .easeOut(duration:0.25):nil,value:alerts)
             ReferencePanel(title:"Recent Events",subtitle:"Live system & monitoring events") {
                 VStack(alignment:.leading,spacing:2) {
                 if events.isEmpty {Text("No recorded events yet").font(.system(size:10)).foregroundStyle(HUD.muted)}

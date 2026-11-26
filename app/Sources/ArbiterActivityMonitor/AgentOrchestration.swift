@@ -3,6 +3,8 @@ import ArbiterCore
 
 struct AgentOrchestration: View {
     @Bindable var store: MonitorStore
+    /// Slim windows: draw the observed harness as a vertical list instead of the four-lane graph.
+    var list = false
     @Environment(\.hudSnapshot) private var snapshot
     private var selected: AgentSession? { store.sessions.first { $0.id == store.selectedSessionID } ?? store.sessions.first { $0.isRunning || $0.status == "Waiting" } ?? store.sessions.first { $0.parent == nil } ?? store.sessions.first }
     var body: some View {
@@ -22,7 +24,9 @@ struct AgentOrchestration: View {
                     Text(selected.map {"\($0.app.rawValue) · \($0.id.prefix(8))"} ?? "Select session").lineLimit(1)
                 }.menuStyle(.borderlessButton).fixedSize() }
             }.font(.system(size:10))
-            if let selected {
+            if let selected, list {
+                HarnessList(harness:HarnessBuilder.build(session:selected,sessions:store.sessions,processes:store.latest?.processes ?? [])) {store.inspectedSessionID=selected.id}
+            } else if let selected {
                 HarnessGraph(harness:HarnessBuilder.build(session:selected,sessions:store.sessions,processes:store.latest?.processes ?? []),previewHover:store.previewHover.flatMap(HarnessNode.Kind.init(rawValue:))) {store.inspectedSessionID=selected.id}
                     .frame(height:156).zIndex(1)
             } else {
@@ -45,6 +49,8 @@ struct AgentOrchestration: View {
 
 struct SessionAgentsPanel: View {
     @Bindable var store: MonitorStore
+    /// Stacked layouts: take the list's natural height instead of filling a fixed slot.
+    var fit = false
     @State private var showInactive=false
     @State private var showUnconfirmed=false
     @Environment(\.hudSnapshot) private var snapshot
@@ -60,7 +66,8 @@ struct SessionAgentsPanel: View {
                 Text("APPLICATION / MODEL").frame(maxWidth:.infinity,alignment:.leading)
                 Text("App CPU").frame(width:48);Text("App RAM").frame(width:57);Text("Tokens").frame(width:52)
             }.font(.system(size:9)).foregroundStyle(HUD.muted).padding(.top,3)
-            if snapshot {sessionList;Spacer(minLength:0)}
+            if fit {sessionList}
+            else if snapshot {sessionList;Spacer(minLength:0)}
             else {ScrollView {sessionList}.scrollIndicators(.automatic)}
             Text("CPU/RAM are shared app totals. Tokens are cumulative per session.").font(.system(size:9)).foregroundStyle(HUD.muted).lineLimit(2)
         }

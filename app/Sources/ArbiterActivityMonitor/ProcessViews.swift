@@ -75,6 +75,7 @@ struct ProcessesView: View {
     @AppStorage("processSort") private var sort = ProcessSort.cpu
     @State private var scope = "All"
     @State private var selection = Set<String>()
+    @Environment(\.hudLayout) private var layout
     var compact = false
     private var selected: [ProcessSample] { (store.latest?.processes ?? []).filter { selection.contains($0.id) } }
     private var rows: [ProcessSample] {
@@ -95,10 +96,14 @@ struct ProcessesView: View {
     var body: some View {
         Panel(title: compact ? "Top resource consumers" : "Process explorer", subtitle: "CPU: 100% = ONE CORE · MEMORY: RESIDENT BYTES · DENIED COUNTERS: —") {
             if !compact {
-                HStack {
-                    TextField("Search name or PID", text: $query).textFieldStyle(.roundedBorder)
-                    Picker("Scope", selection: $scope) { ForEach(["All", "User", "System", "Pinned"], id: \.self) { Text($0) } }.frame(width: 160)
-                    Picker("Sort", selection: $sort) { ForEach(ProcessSort.allCases, id: \.self) { Text($0.rawValue) } }.frame(width: 160)
+                let filters = Group {
+                    Picker("Scope", selection: $scope) { ForEach(["All", "User", "System", "Pinned"], id: \.self) { Text($0) } }.frame(maxWidth: 160)
+                    Picker("Sort", selection: $sort) { ForEach(ProcessSort.allCases, id: \.self) { Text($0.rawValue) } }.frame(maxWidth: 160)
+                }
+                if layout == .wide {
+                    HStack { TextField("Search name or PID", text: $query).textFieldStyle(.roundedBorder); filters }
+                } else {
+                    VStack(alignment: .leading, spacing: 8) { TextField("Search name or PID", text: $query).textFieldStyle(.roundedBorder); HStack { filters } }
                 }
             }
             HStack {
@@ -111,7 +116,9 @@ struct ProcessesView: View {
                 SortHeader(title: "PROCESS", active: sort == .name) { sort = .name }.frame(maxWidth: .infinity, alignment: .leading)
                 SortHeader(title: "CPU", active: sort == .cpu) { sort = .cpu }.frame(width: 65, alignment: .trailing)
                 SortHeader(title: "MEMORY", active: sort == .memory) { sort = .memory }.frame(width: 85, alignment: .trailing)
-                if !compact { Text("THREADS").frame(width: 60); Text("READ / WRITE").frame(width: 145); Text("STATE").frame(width: 75) }
+                if !compact && layout == .wide { Text("THREADS").frame(width: 60) }
+                if !compact && layout >= .stacked { Text("READ / WRITE").frame(width: 145) }
+                if !compact && layout == .wide { Text("STATE").frame(width: 75) }
             }.font(.system(size: 10, weight: .medium)).foregroundStyle(HUD.muted)
             if !compact && !selected.isEmpty {
                 QuitBar(count: selected.count, clear: { selection = [] }) { mode in store.requestQuit(selected, mode: mode) }
@@ -132,11 +139,9 @@ struct ProcessesView: View {
                             }.frame(maxWidth: .infinity, alignment: .leading)
                             Text(percent(p.cpu)).monospacedDigit().foregroundStyle(HUD.cyan).frame(width: 65, alignment: .trailing)
                             Text(p.memory.map(bytes) ?? "—").monospacedDigit().frame(width: 85, alignment: .trailing)
-                            if !compact {
-                                Text(p.threads.map(String.init) ?? "—").frame(width: 60)
-                                Text("\(rate(p.read)) / \(rate(p.write))").font(.system(size: 10)).frame(width: 145)
-                                Text(p.state).foregroundStyle(HUD.muted).frame(width: 75)
-                            }
+                            if !compact && layout == .wide { Text(p.threads.map(String.init) ?? "—").frame(width: 60) }
+                            if !compact && layout >= .stacked { Text("\(rate(p.read)) / \(rate(p.write))").font(.system(size: 10)).frame(width: 145) }
+                            if !compact && layout == .wide { Text(p.state).foregroundStyle(HUD.muted).frame(width: 75) }
                         }.font(.system(size: 11)).padding(.vertical, 9).padding(.horizontal, 5)
                             .background(store.selectedProcessID == p.id ? HUD.cyan.opacity(0.1) : .clear)
                     }.buttonStyle(.plain).modifier(QuitMenu(processes: [p], quit: store.requestQuit))

@@ -183,6 +183,7 @@ struct UpdateSettings: View {
         case .upToDate: ("Version \(store.appVersion) is the latest", HUD.green, "checkmark.circle")
         case .available(let release): ("Version \(release.version) is available · \(bytes(UInt64(release.size)))", HUD.amber, "arrow.down.circle")
         case .installing(let release): ("Downloading and verifying version \(release.version)…", HUD.cyan, "arrow.down.circle")
+        case .installed(let release): ("Version \(release.version) is installed · relaunches when you switch to another app", HUD.green, "checkmark.circle")
         case .failed(let reason): (reason, HUD.amber, "exclamationmark.triangle")
         }
     }
@@ -197,12 +198,15 @@ struct UpdateSettings: View {
                 if case .available = store.updateState {
                     Button("Install and relaunch", systemImage: "arrow.down.circle") { Task { await store.installUpdate() } }.disabled(store.updateBlocker != nil)
                 }
+                if case .installed = store.updateState {
+                    Button("Relaunch now", systemImage: "arrow.clockwise") { store.relaunch() }
+                }
                 Button("Check now", systemImage: "arrow.triangle.2.circlepath") { Task { await store.checkForUpdate() } }.disabled(busy || store.updateBlocker != nil)
             }
             if let blocker = store.updateBlocker { Label(blocker, systemImage: "info.circle").font(.system(size: 11)).foregroundStyle(HUD.amber) }
-            Toggle("Check for updates automatically, once a day", isOn: $store.autoCheckUpdates).disabled(store.updateBlocker != nil)
-            Toggle("Install updates automatically and relaunch", isOn: $store.autoInstallUpdates).disabled(!store.autoCheckUpdates || store.updateBlocker != nil)
-            Text("Reads the public release list at github.com/Tantum-Arbiter/arbiter-activity-monitor. A download is installed only if it matches the published SHA-256 checksum, is this app, carries the advertised version and has an intact code signature. Nothing about this Mac or your sessions is sent. Both switches are off until you turn them on.")
+            Toggle("Check for updates automatically (at launch and every 6 hours)", isOn: $store.autoCheckUpdates).disabled(store.updateBlocker != nil)
+            Toggle("Install updates automatically · relaunches when you switch to another app", isOn: $store.autoInstallUpdates).disabled(!store.autoCheckUpdates || store.updateBlocker != nil)
+            Text("Reads the public release list at github.com/Tantum-Arbiter/arbiter-activity-monitor. A download is installed only if it matches the published SHA-256 checksum, is this app, carries the advertised version and has an intact code signature. An automatic install never interrupts you: the new version is swapped in on disk and the app reopens the next time it is in the background. Nothing about this Mac or your sessions is sent. The app asks once whether to turn these on; until then both are off.")
                 .font(.system(size: 11)).foregroundStyle(HUD.muted)
         }
     }
